@@ -1,0 +1,6 @@
+add_subdirectory(Animation_Demo)
+add_subdirectory(Barnsley_Fern)
+add_subdirectory(Mandelbrot_Set)
+add_subdirectory(Game_of_Life)
+add_subdirectory(VGA_Graphics_Primitives)
+add_subdirectory(Boids)
