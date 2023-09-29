@@ -89,7 +89,7 @@ char color = WHITE;
 
 // total number of boids
 volatile int numberOfBoids = 0;
-#define spawnedBoids 2000
+#define spawnedBoids 800
 
 fix15 boid_x[spawnedBoids];
 fix15 boid_y[spawnedBoids];
@@ -257,7 +257,7 @@ static PT_THREAD(protothread_serial(struct pt * pt)) {
 
   while (1) {
     // print prompt
-    sprintf(pt_serial_out_buffer, "input a number in the range 1-7: ");
+    sprintf(pt_serial_out_buffer, "input a number in the range 1-6: ");
     serial_write;
     serial_read;
     sscanf(pt_serial_in_buffer, "%d", & user_input);
