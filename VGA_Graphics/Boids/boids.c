@@ -70,16 +70,16 @@ int no_bounding = 0;
 #define hitLeft(a)(a < int2fix15(left))
 #define hitRight(a)(a > int2fix15(right))
 
-fix15 turnfactor = float2fix15(0.2);
-fix15 visualRange = int2fix15(40);
-fix15 protectedRange = int2fix15(8);
-fix15 centeringfactor = float2fix15(0.0005);
-fix15 avoidfactor = float2fix15(0.05);
-fix15 matchingfactor = float2fix15(0.05);
-fix15 maxspeed = int2fix15(6);
-fix15 minspeed = int2fix15(3);
-fix15 predatorturnfactor = float2fix15(0.5);
-fix15 predatorRange = int2fix15(100);
+volatile fix15 turnfactor = float2fix15(0.2);
+volatile fix15 visualRange = int2fix15(40);
+volatile fix15 protectedRange = int2fix15(8);
+volatile fix15 centeringfactor = float2fix15(0.0005);
+volatile fix15 avoidfactor = float2fix15(0.05);
+volatile fix15 matchingfactor = float2fix15(0.05);
+volatile fix15 maxspeed = int2fix15(6);
+volatile fix15 minspeed = int2fix15(3);
+volatile fix15 predatorturnfactor = float2fix15(0.5);
+volatile fix15 predatorRange = int2fix15(100);
 
 // uS per frame
 #define FRAME_RATE 33000
@@ -89,7 +89,8 @@ char color = WHITE;
 
 // total number of boids
 volatile int numberOfBoids = 0;
-#define spawnedBoids 800
+#define spawnedBoids 750
+#define spawnedBoidsHalved spawnedBoids / 2
 
 fix15 boid_x[spawnedBoids];
 fix15 boid_y[spawnedBoids];
@@ -110,16 +111,26 @@ void spawnBoid(fix15 * x, fix15 * y, fix15 * vx, fix15 * vy, int direction, int 
   // increment numberOfBoids
   numberOfBoids++;
   // Start in center of screen
-  int x_dir = (320 + idx * 10) % (right + 1 - left) + left;
-  int y_dir = (240 + idx * 10) % (bottom + 1 - top) + top;
+  // 640 x 480
+  int x_dir = rand() % (620 + 1 - 50) + 50;
+  int y_dir = rand() % (440 + 1 - 50) + 50;
   * x = int2fix15(x_dir);
   * y = int2fix15(y_dir);
+  int x_vel = rand() % (6 + 1 - 3) + 3;
+  int y_vel = Q_sqrt(36 - x_vel);
   // Choose left or right
-  if (direction) * vx = int2fix15(3);
-  else * vx = int2fix15(-3);
+  if (direction) {
+    * vx = int2fix15(x_vel);
+    * vy = int2fix15(y_vel);
+  }
+  else {
+    * vx = int2fix15(-x_vel);
+    * vy = int2fix15(-y_vel);
+  }
   // Moving down
-  * vy = int2fix15(1);
 }
+
+volatile int checkNeighbors = 0;
 
 // Draw the boundaries
 void drawArena() {
@@ -147,7 +158,7 @@ void wallsAndEdges(fix15 * x, fix15 * y, fix15 * vx, fix15 * vy, int idx) {
   fix15 close_dx = int2fix15(0);
   fix15 close_dy = int2fix15(0);
 
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < spawnedBoids; i=i+10) {
     if (i != idx) {
       fix15 dx = * x - boid_x[i];
       fix15 dy = * y - boid_y[i];
@@ -175,6 +186,11 @@ void wallsAndEdges(fix15 * x, fix15 * y, fix15 * vx, fix15 * vy, int idx) {
     ypos_avg = divfix(ypos_avg, neighboring_boids);
     xvel_avg = divfix(xvel_avg, neighboring_boids);
     yvel_avg = divfix(yvel_avg, neighboring_boids);
+    //xpos_avg = xpos_avg >> 2;
+    //ypos_avg = ypos_avg >> 2;
+    //xvel_avg = xvel_avg >> 3;
+    //yvel_avg = yvel_avg >> 3;
+
 
     *vx = *vx + multfix15(xpos_avg - *x,centeringfactor) + 
                 multfix15(xvel_avg - *vx, matchingfactor);
@@ -189,17 +205,19 @@ void wallsAndEdges(fix15 * x, fix15 * y, fix15 * vx, fix15 * vy, int idx) {
   int y_pos = fix2int15(*y);
 
   if (no_bounding == 1) {
-    if (x_pos > 620) {
-      x_pos = (x_pos) % 620;
+    if (x_pos < 5 || x_pos > 620) {
+      if (x_pos < 5) {
+        x_pos = (620 - x_pos);
+      } else if (x_pos > 620) {
+        x_pos = x_pos - 620;
+      }
     }
-    if (x_pos < 5) {
-      x_pos = (620 - x_pos) % 620;
-    }
-    if (y_pos > 440) {
-      y_pos = (y_pos) % 440;
-    }
-    if (y_pos < 5) {
-      y_pos = (440 - y_pos) % 440;
+    if (y_pos < 5 || y_pos > 440) {
+      if (y_pos < 5) {
+        y_pos = (440 - y_pos);
+      } else if (y_pos > 440) {
+        y_pos = y_pos - 440;
+      }
     }
 
     *x = int2fix15(x_pos);
@@ -345,52 +363,49 @@ static PT_THREAD(protothread_anim(struct pt * pt)) {
   static int begin_time;
   static int spare_time;
 
-  // Spawn a boid
-  for (int i = 0; i < spawnedBoids / 2; ++i) {
-    spawnBoid( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i % 2, i);
-  }
-
   char numberOfBoids_str[85];
   char elapsedTime_str[75];
-  char spareTime_str[70];
+  char spareTime_str[95];
+
+  int skip = 0;
 
   while (1) {
+    skip++;
+    if (skip == 10) skip = 0;
     // Measure time at start of thread
     begin_time = time_us_32();
-    // erase boid
-    for (int i = 0; i < spawnedBoids / 2; ++i) {
-      drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, BLACK);
-    }
-
-    fillRect(0, 0, 105, 30, BLACK);
-    setTextColor(RED);
-    setTextSize(1);
 
     setCursor(0, 0);
     sprintf(numberOfBoids_str, "%d%s", numberOfBoids, " boids");
     writeString(numberOfBoids_str);
 
-    setCursor(0, 10);
-    sprintf(elapsedTime_str, "%s%d", "Elapsed time: ", begin_time / 1000000);
-    writeString(elapsedTime_str);
+    if (skip == 0) {
+      fillRect(0, 0, 105, 30, BLACK);
+      setTextColor(RED);
+      setTextSize(1);
 
-    // update boid's position and velocity
-    for (int i = 0; i < spawnedBoids / 2; ++i) {
-      wallsAndEdges( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i);
+      setCursor(0, 10);
+      sprintf(elapsedTime_str, "%s%d", "Elapsed time: ", begin_time >> 20);
+      writeString(elapsedTime_str);
     }
 
-    // draw the boid at its new position
-    for (int i = 0; i < spawnedBoids / 2; ++i) {
+    // erase boid, update boid's position and velocity, draw boid
+    for (int i = 0; i < spawnedBoidsHalved; ++i) {
+      drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, BLACK);
+      wallsAndEdges( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i);
       drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, color);
     }
+
     // draw the boundaries
     drawArena();
     // delay in accordance with frame rate
     spare_time = FRAME_RATE - (time_us_32() - begin_time);
 
-    setCursor(0, 20);
-    sprintf(spareTime_str, "%s%d", "Spare time: ", spare_time);
-    writeString(spareTime_str);
+    if (skip == 0) {
+      setCursor(0, 20);
+      sprintf(spareTime_str, "%s%d", "Spare time: ", spare_time);
+      writeString(spareTime_str);
+    }
 
     // yield for necessary amount of time
     PT_YIELD_usec(spare_time);
@@ -408,27 +423,17 @@ static PT_THREAD(protothread_anim1(struct pt * pt)) {
   static int begin_time;
   static int spare_time;
 
-  // Spawn a boid
-  for (int i = spawnedBoids / 2; i < spawnedBoids; ++i) {
-    spawnBoid( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], (i + 1) % 2, i);
-  }
-
   while (1) {
     // Measure time at start of thread
     begin_time = time_us_32();
-    // erase boid
-    for (int i = spawnedBoids / 2 ; i < spawnedBoids; ++i) {
-      drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, BLACK);
-    }
-    // update boid's position and velocity
-    for (int i = spawnedBoids / 2 ; i < spawnedBoids; ++i) {
-      wallsAndEdges( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i);
-    }
 
-    // draw the boid at its new position
-    for (int i = spawnedBoids / 2 ; i < spawnedBoids; ++i) {
+    // erase boid, update boid's position and velocity, draw boid
+    for (int i = spawnedBoidsHalved ; i < spawnedBoids; ++i) {
+      drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, BLACK);
+      wallsAndEdges( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i);
       drawRect(fix2int15(boid_x[i]), fix2int15(boid_y[i]), 2, 2, color);
     }
+
     // delay in accordance with frame rate
     spare_time = FRAME_RATE - (time_us_32() - begin_time);
     // yield for necessary amount of time
@@ -460,14 +465,15 @@ int main() {
   // initialize VGA
   initVGA();
 
-  // start core 1 
-  // comment out core 1
-  // multicore_reset_core1();
-  // multicore_launch_core1(&core1_main);
+  for (int i = 0; i < spawnedBoids; ++i) {
+    spawnBoid( & boid_x[i], & boid_y[i], & boid_vx[i], & boid_vy[i], i % 2, i);
+  }
+
+  multicore_reset_core1();
+  multicore_launch_core1(&core1_main);
 
   pt_add_thread(protothread_serial);
   pt_add_thread(protothread_anim);
-  pt_add_thread(protothread_anim1);
 
   // start scheduler
   pt_schedule_start;
