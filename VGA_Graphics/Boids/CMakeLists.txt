@@ -3,9 +3,9 @@ add_executable(boids)
 add_compile_options(-Ofast)
 
 # must match with pio filename and executable name from above
-pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Animation_Demo/hsync.pio)
-pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Animation_Demo//vsync.pio)
-pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Animation_Demo//rgb.pio)
+pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Boids/hsync.pio)
+pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Boids//vsync.pio)
+pico_generate_pio_header(boids ${CMAKE_CURRENT_LIST_DIR}/../Boids//rgb.pio)
 
 # must match with executable name and source file names
 target_sources(boids PRIVATE boids.c vga_graphics.c)

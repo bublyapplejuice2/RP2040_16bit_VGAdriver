@@ -89,8 +89,10 @@ char color = WHITE;
 
 // total number of boids
 volatile int numberOfBoids = 0;
-#define spawnedBoids 750
+#define spawnedBoids 1500
 #define spawnedBoidsHalved spawnedBoids / 2
+
+long time = 0;
 
 fix15 boid_x[spawnedBoids];
 fix15 boid_y[spawnedBoids];
@@ -158,7 +160,7 @@ void wallsAndEdges(fix15 * x, fix15 * y, fix15 * vx, fix15 * vy, int idx) {
   fix15 close_dx = int2fix15(0);
   fix15 close_dy = int2fix15(0);
 
-  for (int i = 0; i < spawnedBoids; i=i+10) {
+  for (int i = 0; i < spawnedBoids; i = i + 20) {
     if (i != idx) {
       fix15 dx = * x - boid_x[i];
       fix15 dy = * y - boid_y[i];
@@ -362,12 +364,11 @@ static PT_THREAD(protothread_anim(struct pt * pt)) {
   // Variables for maintaining frame rate
   static int begin_time;
   static int spare_time;
-
-  char numberOfBoids_str[85];
-  char elapsedTime_str[75];
-  char spareTime_str[95];
-
+  char spareTime0_str[100];
   int skip = 0;
+
+  char numberOfBoids_str[100];
+  char elapsedTime_str[100];
 
   while (1) {
     skip++;
@@ -380,8 +381,7 @@ static PT_THREAD(protothread_anim(struct pt * pt)) {
     writeString(numberOfBoids_str);
 
     if (skip == 0) {
-      fillRect(0, 0, 105, 30, BLACK);
-      setTextColor(RED);
+      setTextColor2(RED, BLACK);
       setTextSize(1);
 
       setCursor(0, 10);
@@ -403,8 +403,12 @@ static PT_THREAD(protothread_anim(struct pt * pt)) {
 
     if (skip == 0) {
       setCursor(0, 20);
-      sprintf(spareTime_str, "%s%d", "Spare time: ", spare_time);
-      writeString(spareTime_str);
+      time += spare_time;
+      if (begin_time % 10 == 0) {
+        printf("%d\n", time);
+      }
+      snprintf(spareTime0_str, sizeof(spareTime0_str), "Spare time: %d   ", spare_time);
+      writeString(spareTime0_str);
     }
 
     // yield for necessary amount of time
@@ -422,8 +426,11 @@ static PT_THREAD(protothread_anim1(struct pt * pt)) {
   // Variables for maintaining frame rate
   static int begin_time;
   static int spare_time;
+  int skip = 0;
 
   while (1) {
+    skip++;
+    if (skip == 10) skip = 0;
     // Measure time at start of thread
     begin_time = time_us_32();
 
@@ -436,6 +443,7 @@ static PT_THREAD(protothread_anim1(struct pt * pt)) {
 
     // delay in accordance with frame rate
     spare_time = FRAME_RATE - (time_us_32() - begin_time);
+
     // yield for necessary amount of time
     PT_YIELD_usec(spare_time);
     // NEVER exit while
@@ -459,6 +467,7 @@ void core1_main() {
 // ========================================
 // USE ONLY C-sdk library
 int main() {
+  set_sys_clock_khz(250000, true);
   // initialize stio
   stdio_init_all();
 
