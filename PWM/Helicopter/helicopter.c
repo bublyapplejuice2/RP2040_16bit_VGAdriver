@@ -20,7 +20,34 @@
 #include "hardware/pwm.h"
 #include "hardware/irq.h"
 
+// Include hardware libraries
+#include "hardware/pwm.h"
+#include "hardware/dma.h"
+#include "hardware/irq.h"
+#include "hardware/adc.h"
+#include "hardware/pio.h"
+#include "hardware/i2c.h"
+// Include custom libraries
+#include "vga_graphics.h"
+#include "mpu6050.h"
 #include "pt_cornell_rp2040_v1.h"
+
+// Arrays in which raw measurements will be stored
+fix15 acceleration[3], gyro[3];
+
+// character array
+char screentext[40];
+
+// draw speed
+int threshold = 10 ;
+
+// Some macros for max/min/abs
+#define min(a,b) ((a<b) ? a:b)
+#define max(a,b) ((a<b) ? b:a)
+#define abs(a) ((a>0) ? a:-a)
+
+// semaphore
+static struct pt_sem vga_semaphore ;
 
 // PWM wrap value and clock divide value
 // For a CPU rate of 125 MHz, this gives
@@ -35,6 +62,9 @@ uint slice_num ;
 volatile int control ;
 volatile int old_control ;
 
+volatile fix15 complementary_angle = int2fix15(0);
+fix15 PI = float2fix15(3.15149);
+
 // PWM interrupt service routine
 void on_pwm_wrap() {
     // Clear the interrupt flag that brought us here
@@ -44,6 +74,116 @@ void on_pwm_wrap() {
         old_control = control ;
         pwm_set_chan_level(slice_num, PWM_CHAN_B, control);
     }
+    mpu6050_read_raw(acceleration, gyro);
+
+    // Accelerometer angle (degrees - 15.16 fixed point) 
+    // Only ONE of the two lines below will be used, depending whether or not a small angle approximation is appropriate
+
+    // SMALL ANGLE APPROXIMATION
+    fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
+    // NO SMALL ANGLE APPROXIMATION [IGNORE]
+    // fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + PI), oneeightyoverpi);
+
+    // Gyro angle delta (measurement times timestep) (15.16 fixed point)
+    fix15 gyro_angle_delta = multfix15(gyro[2], zeropt001) ;
+
+    // Complementary angle (degrees - 15.16 fixed point)
+    complementary_angle = multfix15(complementary_angle - gyro_angle_delta, zeropt999) + multfix15(accel_angle, zeropt001);
+
+    // Signal VGA to draw
+    PT_SEM_SIGNAL(pt, &vga_semaphore);
+
+    // Signal VGA to draw
+    PT_SEM_SIGNAL(pt, &vga_semaphore);
+}
+
+// Thread that draws to VGA display
+static PT_THREAD (protothread_vga(struct pt *pt))
+{
+    // Indicate start of thread
+    PT_BEGIN(pt) ;
+
+    // We will start drawing at column 81
+    static int xcoord = 81 ;
+    
+    // Rescale the measurements for display
+    static float OldRange = 500. ; // (+/- 250)
+    static float NewRange = 150. ; // (looks nice on VGA)
+    static float OldMin = -250. ;
+    static float OldMax = 250. ;
+
+    // Control rate of drawing
+    static int throttle ;
+
+    // Draw the static aspects of the display
+    setTextSize(1) ;
+    setTextColor(WHITE);
+
+    // Draw bottom plot
+    drawHLine(75, 430, 5, CYAN) ;
+    drawHLine(75, 355, 5, CYAN) ;
+    drawHLine(75, 280, 5, CYAN) ;
+    drawVLine(80, 280, 150, CYAN) ;
+    sprintf(screentext, "0") ;
+    setCursor(50, 350) ;
+    writeString(screentext) ;
+    sprintf(screentext, "+2") ;
+    setCursor(50, 280) ;
+    writeString(screentext) ;
+    sprintf(screentext, "-2") ;
+    setCursor(50, 425) ;
+    writeString(screentext) ;
+
+    // Draw top plot
+    drawHLine(75, 230, 5, CYAN) ;
+    drawHLine(75, 155, 5, CYAN) ;
+    drawHLine(75, 80, 5, CYAN) ;
+    drawVLine(80, 80, 150, CYAN) ;
+    sprintf(screentext, "0") ;
+    setCursor(50, 150) ;
+    writeString(screentext) ;
+    sprintf(screentext, "+250") ;
+    setCursor(45, 75) ;
+    writeString(screentext) ;
+    sprintf(screentext, "-250") ;
+    setCursor(45, 225) ;
+    writeString(screentext) ;
+    
+
+    while (true) {
+        // Wait on semaphore
+        PT_SEM_WAIT(pt, &vga_semaphore);
+        // Increment drawspeed controller
+        throttle += 1 ;
+        // If the controller has exceeded a threshold, draw
+        if (throttle >= threshold) { 
+            // Zero drawspeed controller
+            throttle = 0 ;
+
+            // Erase a column
+            drawVLine(xcoord, 0, 480, BLACK) ;
+
+            // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
+            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[0])*120.0)-OldMin)/OldRange)), WHITE) ;
+            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[1])*120.0)-OldMin)/OldRange)), RED) ;
+            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[2])*120.0)-OldMin)/OldRange)), GREEN) ;
+
+            // Draw top plot
+            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[0]))-OldMin)/OldRange)), WHITE) ;
+            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[1]))-OldMin)/OldRange)), RED) ;
+            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[2]))-OldMin)/OldRange)), GREEN) ;
+
+            // Update horizontal cursor
+            if (xcoord < 609) {
+                xcoord += 1 ;
+            }
+            else {
+                xcoord = 81 ;
+            }
+        }
+    }
+    // Indicate end of thread
+    PT_END(pt);
 }
 
 // User input thread
@@ -65,16 +205,38 @@ static PT_THREAD (protothread_serial(struct pt *pt))
     PT_END(pt) ;
 }
 
+// Entry point for core 1
+void core1_entry() {
+    pt_add_thread(protothread_vga) ;
+    pt_schedule_start ;
+}
+
 int main() {
 
     // Initialize stdio
     stdio_init_all();
+
+    // Initialize VGA
+    initVGA() ;
+
+    ////////////////////////////////////////////////////////////////////////
+    ///////////////////////// I2C CONFIGURATION ////////////////////////////
+    i2c_init(I2C_CHAN, I2C_BAUD_RATE) ;
+    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C) ;
+    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C) ;
+    gpio_pull_up(SDA_PIN) ;
+    gpio_pull_up(SCL_PIN) ;
+
+    // MPU6050 initialization
+    mpu6050_reset();
+    mpu6050_read_raw(acceleration, gyro);
 
     ////////////////////////////////////////////////////////////////////////
     ///////////////////////// PWM CONFIGURATION ////////////////////////////
     ////////////////////////////////////////////////////////////////////////
     // Tell GPIO 5 that it is allocated to the PWM
     gpio_set_function(5, GPIO_FUNC_PWM);
+    gpio_set_function(4, GPIO_FUNC_PWM);
 
     // Find out which PWM slice is connected to GPIO 5 (it's slice 2)
     slice_num = pwm_gpio_to_slice_num(5);
@@ -99,6 +261,10 @@ int main() {
     ////////////////////////////////////////////////////////////////////////
     ///////////////////////////// ROCK AND ROLL ////////////////////////////
     ////////////////////////////////////////////////////////////////////////
+    // start core 1 
+    multicore_reset_core1();
+    multicore_launch_core1(core1_entry);
+
     pt_add_thread(protothread_serial) ;
     pt_schedule_start ;
 
