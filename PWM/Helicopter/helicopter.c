@@ -65,6 +65,9 @@ volatile int old_control ;
 volatile fix15 complementary_angle = int2fix15(0);
 fix15 PI = float2fix15(3.15149);
 
+volatile float filtered_ax = 0.0;
+volatile float filtered_ay = 0.0;
+
 // PWM interrupt service routine
 void on_pwm_wrap() {
     // Clear the interrupt flag that brought us here
@@ -80,9 +83,11 @@ void on_pwm_wrap() {
     // Only ONE of the two lines below will be used, depending whether or not a small angle approximation is appropriate
 
     // SMALL ANGLE APPROXIMATION
-    fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
+    // fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
     // NO SMALL ANGLE APPROXIMATION [IGNORE]
-    // fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + PI), oneeightyoverpi);
+    filtered_ax = filtered_ax + ((int)((fix2float15(acceleration[0]) - filtered_ax))>>6) ;
+    filtered_ay = filtered_ay + ((int)((fix2float15(acceleration[1]) - filtered_ay))>>6) ;
+    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + PI), oneeightyoverpi);
 
     // Gyro angle delta (measurement times timestep) (15.16 fixed point)
     fix15 gyro_angle_delta = multfix15(gyro[2], zeropt001) ;
@@ -117,69 +122,34 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 
     // Draw the static aspects of the display
     setTextSize(1) ;
+    setTextColor(YELLOW);
+
+    char angle_const[100];
+    setCursor(100, 100);
+    sprintf(angle_const, "%s", "Complementary Angle: ");
+    writeString(angle_const);
+
     setTextColor(WHITE);
-
-    // Draw bottom plot
-    drawHLine(75, 430, 5, CYAN) ;
-    drawHLine(75, 355, 5, CYAN) ;
-    drawHLine(75, 280, 5, CYAN) ;
-    drawVLine(80, 280, 150, CYAN) ;
-    sprintf(screentext, "0") ;
-    setCursor(50, 350) ;
-    writeString(screentext) ;
-    sprintf(screentext, "+2") ;
-    setCursor(50, 280) ;
-    writeString(screentext) ;
-    sprintf(screentext, "-2") ;
-    setCursor(50, 425) ;
-    writeString(screentext) ;
-
-    // Draw top plot
-    drawHLine(75, 230, 5, CYAN) ;
-    drawHLine(75, 155, 5, CYAN) ;
-    drawHLine(75, 80, 5, CYAN) ;
-    drawVLine(80, 80, 150, CYAN) ;
-    sprintf(screentext, "0") ;
-    setCursor(50, 150) ;
-    writeString(screentext) ;
-    sprintf(screentext, "+250") ;
-    setCursor(45, 75) ;
-    writeString(screentext) ;
-    sprintf(screentext, "-250") ;
-    setCursor(45, 225) ;
-    writeString(screentext) ;
-    
+    char angle[100];
 
     while (true) {
         // Wait on semaphore
         PT_SEM_WAIT(pt, &vga_semaphore);
         // Increment drawspeed controller
         throttle += 1 ;
+
+        setTextColor2(WHITE, BLACK);
+        setCursor(230, 100);
+        sprintf(angle, "%d", fix2float15(gyro[0]));
+        writeString(angle);
         // If the controller has exceeded a threshold, draw
         if (throttle >= threshold) { 
             // Zero drawspeed controller
             throttle = 0 ;
 
-            // Erase a column
-            drawVLine(xcoord, 0, 480, BLACK) ;
-
-            // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
-            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[0])*120.0)-OldMin)/OldRange)), WHITE) ;
-            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[1])*120.0)-OldMin)/OldRange)), RED) ;
-            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[2])*120.0)-OldMin)/OldRange)), GREEN) ;
-
-            // Draw top plot
-            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[0]))-OldMin)/OldRange)), WHITE) ;
-            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[1]))-OldMin)/OldRange)), RED) ;
-            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(gyro[2]))-OldMin)/OldRange)), GREEN) ;
-
             // Update horizontal cursor
-            if (xcoord < 609) {
-                xcoord += 1 ;
-            }
-            else {
-                xcoord = 81 ;
-            }
+            if (xcoord < 609) { xcoord += 1 ; }
+            else { xcoord = 81 ; }
         }
     }
     // Indicate end of thread
@@ -219,8 +189,6 @@ int main() {
     // Initialize VGA
     initVGA() ;
 
-    ////////////////////////////////////////////////////////////////////////
-    ///////////////////////// I2C CONFIGURATION ////////////////////////////
     i2c_init(I2C_CHAN, I2C_BAUD_RATE) ;
     gpio_set_function(SDA_PIN, GPIO_FUNC_I2C) ;
     gpio_set_function(SCL_PIN, GPIO_FUNC_I2C) ;
@@ -231,9 +199,6 @@ int main() {
     mpu6050_reset();
     mpu6050_read_raw(acceleration, gyro);
 
-    ////////////////////////////////////////////////////////////////////////
-    ///////////////////////// PWM CONFIGURATION ////////////////////////////
-    ////////////////////////////////////////////////////////////////////////
     // Tell GPIO 5 that it is allocated to the PWM
     gpio_set_function(5, GPIO_FUNC_PWM);
     gpio_set_function(4, GPIO_FUNC_PWM);
@@ -258,9 +223,6 @@ int main() {
     // Start the channel
     pwm_set_mask_enabled((1u << slice_num));
 
-    ////////////////////////////////////////////////////////////////////////
-    ///////////////////////////// ROCK AND ROLL ////////////////////////////
-    ////////////////////////////////////////////////////////////////////////
     // start core 1 
     multicore_reset_core1();
     multicore_launch_core1(core1_entry);
