@@ -59,14 +59,16 @@ static struct pt_sem vga_semaphore ;
 uint slice_num ;
 
 // PWM duty cycle
-volatile int control ;
-volatile int old_control ;
+volatile int control  = 0;
+volatile int old_control = 0 ;
+volatile int low_pass = 0 ;
 
 volatile fix15 complementary_angle = int2fix15(0);
 fix15 PI = float2fix15(3.15149);
 
-volatile float filtered_ax = 0.0;
-volatile float filtered_ay = 0.0;
+volatile fix15 filtered_ax = int2fix15(0);
+volatile fix15 filtered_ay = int2fix15(1);
+
 
 // PWM interrupt service routine
 void on_pwm_wrap() {
@@ -85,19 +87,19 @@ void on_pwm_wrap() {
     // SMALL ANGLE APPROXIMATION
     // fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
     // NO SMALL ANGLE APPROXIMATION [IGNORE]
-    filtered_ax = filtered_ax + ((int)((fix2float15(acceleration[0]) - filtered_ax))>>6) ;
-    filtered_ay = filtered_ay + ((int)((fix2float15(acceleration[1]) - filtered_ay))>>6) ;
-    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + PI), oneeightyoverpi);
+    filtered_ax = filtered_ax + ((acceleration[0] - filtered_ax)>>6) ;
+    filtered_ay = filtered_ay + ((acceleration[1] - filtered_ay)>>6) ;
+    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + 3.14159), oneeightyoverpi);
+
+    low_pass = low_pass + ((control - low_pass)>>6);
+    
+    
 
     // Gyro angle delta (measurement times timestep) (15.16 fixed point)
     fix15 gyro_angle_delta = multfix15(gyro[2], zeropt001) ;
 
     // Complementary angle (degrees - 15.16 fixed point)
     complementary_angle = multfix15(complementary_angle - gyro_angle_delta, zeropt999) + multfix15(accel_angle, zeropt001);
-
-    // Signal VGA to draw
-    PT_SEM_SIGNAL(pt, &vga_semaphore);
-
     // Signal VGA to draw
     PT_SEM_SIGNAL(pt, &vga_semaphore);
 }
@@ -122,36 +124,100 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 
     // Draw the static aspects of the display
     setTextSize(1) ;
-    setTextColor(YELLOW);
-
-    char angle_const[100];
-    setCursor(100, 100);
-    sprintf(angle_const, "%s", "Complementary Angle: ");
-    writeString(angle_const);
-
     setTextColor(WHITE);
-    char angle[100];
+
+    // Draw bottom plot
+    drawHLine(75, 430, 5, CYAN) ;
+    drawHLine(75, 355, 5, CYAN) ;
+    drawHLine(75, 280, 5, CYAN) ;
+    drawVLine(80, 280, 150, CYAN) ;
+    sprintf(screentext, "2500") ;
+    setCursor(50, 350) ;
+    writeString(screentext) ;
+    sprintf(screentext, "5000") ;
+    setCursor(50, 280) ;
+    writeString(screentext) ;
+    sprintf(screentext, "0") ;
+    setCursor(50, 425) ;
+    writeString(screentext) ;
+
+    // Draw top plot
+    drawHLine(75, 230, 5, CYAN) ;
+    drawHLine(75, 155, 5, CYAN) ;
+    drawHLine(75, 80, 5, CYAN) ;
+    drawVLine(80, 80, 150, CYAN) ;
+    sprintf(screentext, "90") ;
+    setCursor(50, 150) ;
+    writeString(screentext) ;
+    sprintf(screentext, "180") ;
+    setCursor(45, 75) ;
+    writeString(screentext) ;
+    sprintf(screentext, "0") ;
+    setCursor(45, 225) ;
+    writeString(screentext) ;
+    
 
     while (true) {
         // Wait on semaphore
         PT_SEM_WAIT(pt, &vga_semaphore);
         // Increment drawspeed controller
         throttle += 1 ;
-
-        setTextColor2(WHITE, BLACK);
-        setCursor(230, 100);
-        sprintf(angle, "%d", fix2float15(gyro[0]));
-        writeString(angle);
         // If the controller has exceeded a threshold, draw
         if (throttle >= threshold) { 
             // Zero drawspeed controller
             throttle = 0 ;
 
+            // Erase a column
+            drawVLine(xcoord, 0, 480, BLACK) ;
+
+            // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
+            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(low_pass)/10.0)-OldMin)/OldRange)), GREEN) ;
+
+            // Draw top plot
+            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(complementary_angle))-OldMin)/OldRange)), WHITE) ;
+
+
             // Update horizontal cursor
-            if (xcoord < 609) { xcoord += 1 ; }
-            else { xcoord = 81 ; }
+            if (xcoord < 609) {
+                xcoord += 1 ;
+            }
+            else {
+                xcoord = 81 ;
+            }
         }
     }
+
+    // // Draw the static aspects of the display
+    // setTextSize(1) ;
+    // setTextColor(YELLOW);
+
+    // char angle_const[100];
+    // setCursor(10, 10);
+    // sprintf(angle_const, "%s", "Complementary Angle: ");
+    // writeString(angle_const);
+
+    // char low_pass_const[100];
+    // setCursor(10, 20);
+    // sprintf(low_pass_const, "%s", "Low-Passed Motor Command Signal: ");
+    // writeString(low_pass_const);
+
+    // setTextColor(WHITE);
+    // char angle[100];
+    // char low_pass_arr[100];
+    // while (true) {
+    //     // Wait on semaphore
+    //     PT_SEM_WAIT(pt, &vga_semaphore);
+
+    //     setTextColor2(WHITE, BLACK);
+    //     setCursor(140, 10);
+    //     sprintf(angle, "%f", fix2float15(complementary_angle));
+    //     writeString(angle);
+
+    //     setTextColor2(WHITE, BLACK);
+    //     setCursor(200, 20);
+    //     sprintf(low_pass_arr, "%04d", low_pass);
+    //     writeString(low_pass_arr);
+    // }
     // Indicate end of thread
     PT_END(pt);
 }
