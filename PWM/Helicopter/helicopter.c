@@ -66,8 +66,8 @@ volatile int low_pass = 0 ;
 volatile fix15 complementary_angle = int2fix15(0);
 fix15 PI = float2fix15(3.15149);
 
-volatile fix15 filtered_ax = int2fix15(0);
-volatile fix15 filtered_ay = int2fix15(1);
+volatile fix15 filtered_ay = int2fix15(0);
+volatile fix15 filtered_az = int2fix15(1);
 
 
 // PWM interrupt service routine
@@ -87,11 +87,11 @@ void on_pwm_wrap() {
     // SMALL ANGLE APPROXIMATION
     // fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
     // NO SMALL ANGLE APPROXIMATION [IGNORE]
-    filtered_ax = filtered_ax + ((acceleration[0] - filtered_ax)>>6) ;
-    filtered_ay = filtered_ay + ((acceleration[1] - filtered_ay)>>6) ;
-    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ax, filtered_ay) + 3.14159), oneeightyoverpi);
+    filtered_ay = filtered_ay + ((acceleration[1] - filtered_ay)>>4) ;
+    filtered_az = filtered_az + ((acceleration[2] - filtered_az)>>4) ;
+    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ay, filtered_az) + 3.14159), oneeightyoverpi);
 
-    low_pass = low_pass + ((control - low_pass)>>6);
+    low_pass = low_pass + ((control - low_pass)>>4);
     
     
 
@@ -110,7 +110,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
     // Indicate start of thread
     PT_BEGIN(pt) ;
 
-    // We will start drawing at column 81
+        // We will start drawing at column 81
     static int xcoord = 81 ;
     
     // Rescale the measurements for display
@@ -171,11 +171,11 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             drawVLine(xcoord, 0, 480, BLACK) ;
 
             // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
-            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(low_pass)/10.0)-OldMin)/OldRange)), GREEN) ;
+            drawPixel(xcoord, 430 - (low_pass * 0.03), WHITE) ;
+            // printf("%d\n", (int)((fix2float15(low_pass) * 0.03)));
 
             // Draw top plot
-            drawPixel(xcoord, 230 - (int)(NewRange*((float)((fix2float15(complementary_angle))-OldMin)/OldRange)), WHITE) ;
-
+            drawPixel(xcoord, 230 - (int)((fix2float15(complementary_angle) - 90.0)*0.8333), WHITE) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
@@ -187,7 +187,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
         }
     }
 
-    // // Draw the static aspects of the display
+    // Draw the static aspects of the display
     // setTextSize(1) ;
     // setTextColor(YELLOW);
 
@@ -210,7 +210,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 
     //     setTextColor2(WHITE, BLACK);
     //     setCursor(140, 10);
-    //     sprintf(angle, "%f", fix2float15(complementary_angle));
+    //     sprintf(angle, "%f", fix2float15(complementary_angle) - 90.0);
     //     writeString(angle);
 
     //     setTextColor2(WHITE, BLACK);
