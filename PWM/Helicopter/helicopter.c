@@ -72,12 +72,13 @@ volatile fix15 filtered_az = int2fix15(1);
 
 volatile int desired_angle = 86;
 volatile fix15 error_ang = int2fix15(0);
+volatile fix15 last_err = int2fix15(0);
 
 fix15 Kt = float2fix15(0.0000000005);
 
-fix15 Kp = int2fix15(35);
-fix15 Kd = int2fix15(4000);
-fix15 Ki = float2fix15(0.0625);
+fix15 Kp = int2fix15(20);
+fix15 Kd = int2fix15(2000);
+fix15 Ki = float2fix15(0.03125);
 
 volatile fix15 proportional_cntl = int2fix15(0);
 volatile fix15 differential_cntl = int2fix15(0);
@@ -85,6 +86,12 @@ volatile fix15 integral_cntl = int2fix15(0);
 fix15 motor_lp = float2fix15(0.95);
 fix15 dd = float2fix15(0.005);
 
+
+int oppositeSigns(fix15 x, fix15 y) {
+    if ( (fix2int15(x) ^ fix2int15(y)) < 0 ) {
+        return 1; // True
+    } return 0; // False
+}
 
 // PWM interrupt service routine
 void on_pwm_wrap() {
@@ -114,10 +121,22 @@ void on_pwm_wrap() {
     int temp_ctrl = 0;
     // error angle = desired_angle - previous complementary_angle
     error_ang = int2fix15(desired_angle) - complementary_angle;
-    // proportional_cntl = proportional_constant * error angle
+    // printf("error: %d\n", fix2int15(error_ang));
+    
     proportional_cntl = multfix15(Kp, error_ang);
+    differential_cntl = multfix15(Kd, error_ang - last_err);
+    integral_cntl += error_ang;
+
+    // integral ctrl is accumulator
+    // set to 0 if sign of errors different
+    if (oppositeSigns(error_ang, last_err) == 1) {
+        integral_cntl = 0;
+    }
+
+    integral_cntl = multfix15(Ki, integral_cntl);
+
     // add 3 controls together
-    temp_ctrl = fix2int15(proportional_cntl + differential_cntl + integral_cntl);
+    temp_ctrl = fix2int15(proportional_cntl) + fix2int15(differential_cntl) + fix2int15(integral_cntl);
     // clamp control to between 0 and 5k
     if (temp_ctrl > 5000) {
         temp_ctrl = 5000;
@@ -126,8 +145,7 @@ void on_pwm_wrap() {
     }
     // set control to the new control
     control = temp_ctrl;
-    // printf("control: %d\n", control);
-    // printf("complementary: %d\n", fix2int15(complementary_angle));
+    last_err = error_ang;
 
     // Signal VGA to draw
     PT_SEM_SIGNAL(pt, &vga_semaphore);
@@ -203,7 +221,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             // printf("%d\n", (int)((fix2float15(low_pass))));
 
             // Draw top plot
-            drawPixel(xcoord, 228 - (int)((fix2float15(complementary_angle) - 90.0)*0.8333), WHITE) ;
+            drawPixel(xcoord, 225 - (int)((fix2float15(complementary_angle) - 90.0)*0.8333), WHITE) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
@@ -249,11 +267,11 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             test_in = -1;
         }
         else if ( test_in == 3 ) {
-            sprintf(pt_serial_out_buffer, "input Kd, 0 to 2000: \r\n");
+            sprintf(pt_serial_out_buffer, "input Kd, 0 to 1000: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            if ( test_in >= 0 && test_in <= 2000 ) {
+            if ( test_in >= 0 && test_in <= 1000 ) {
                 Kd = int2fix15(test_in) ;
             }
             test_in = -1;
