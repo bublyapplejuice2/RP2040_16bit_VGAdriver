@@ -59,15 +59,31 @@ static struct pt_sem vga_semaphore ;
 uint slice_num ;
 
 // PWM duty cycle
-volatile int control  = 0;
+volatile int control  = 1000;
 volatile int old_control = 0 ;
 volatile int low_pass = 0 ;
 
 volatile fix15 complementary_angle = int2fix15(0);
+volatile fix15 prev_complementary_angle = int2fix15(0);
 fix15 PI = float2fix15(3.15149);
 
 volatile fix15 filtered_ay = int2fix15(0);
 volatile fix15 filtered_az = int2fix15(1);
+
+volatile int desired_angle = 86;
+volatile fix15 error_ang = int2fix15(0);
+
+fix15 Kt = float2fix15(0.0000000005);
+
+fix15 Kp = int2fix15(35);
+fix15 Kd = int2fix15(4000);
+fix15 Ki = float2fix15(0.0625);
+
+volatile fix15 proportional_cntl = int2fix15(0);
+volatile fix15 differential_cntl = int2fix15(0);
+volatile fix15 integral_cntl = int2fix15(0);
+fix15 motor_lp = float2fix15(0.95);
+fix15 dd = float2fix15(0.005);
 
 
 // PWM interrupt service routine
@@ -82,24 +98,37 @@ void on_pwm_wrap() {
     mpu6050_read_raw(acceleration, gyro);
 
     // Accelerometer angle (degrees - 15.16 fixed point) 
-    // Only ONE of the two lines below will be used, depending whether or not a small angle approximation is appropriate
-
-    // SMALL ANGLE APPROXIMATION
-    // fix15 accel_angle = multfix15(divfix(acceleration[0], acceleration[1]), oneeightyoverpi) ;
-    // NO SMALL ANGLE APPROXIMATION [IGNORE]
+    // NO SMALL ANGLE APPROXIMATION
     filtered_ay = filtered_ay + ((acceleration[1] - filtered_ay)>>4) ;
     filtered_az = filtered_az + ((acceleration[2] - filtered_az)>>4) ;
     fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ay, filtered_az) + 3.14159), oneeightyoverpi);
 
     low_pass = low_pass + ((control - low_pass)>>4);
-    
-    
 
     // Gyro angle delta (measurement times timestep) (15.16 fixed point)
     fix15 gyro_angle_delta = multfix15(gyro[2], zeropt001) ;
 
     // Complementary angle (degrees - 15.16 fixed point)
     complementary_angle = multfix15(complementary_angle - gyro_angle_delta, zeropt999) + multfix15(accel_angle, zeropt001);
+
+    int temp_ctrl = 0;
+    // error angle = desired_angle - previous complementary_angle
+    error_ang = int2fix15(desired_angle) - complementary_angle;
+    // proportional_cntl = proportional_constant * error angle
+    proportional_cntl = multfix15(Kp, error_ang);
+    // add 3 controls together
+    temp_ctrl = fix2int15(proportional_cntl + differential_cntl + integral_cntl);
+    // clamp control to between 0 and 5k
+    if (temp_ctrl > 5000) {
+        temp_ctrl = 5000;
+    } else if (temp_ctrl < 0) {
+        temp_ctrl = 0;
+    }
+    // set control to the new control
+    control = temp_ctrl;
+    // printf("control: %d\n", control);
+    // printf("complementary: %d\n", fix2int15(complementary_angle));
+
     // Signal VGA to draw
     PT_SEM_SIGNAL(pt, &vga_semaphore);
 }
@@ -156,7 +185,6 @@ static PT_THREAD (protothread_vga(struct pt *pt))
     setCursor(45, 225) ;
     writeString(screentext) ;
     
-
     while (true) {
         // Wait on semaphore
         PT_SEM_WAIT(pt, &vga_semaphore);
@@ -171,11 +199,11 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             drawVLine(xcoord, 0, 480, BLACK) ;
 
             // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
-            drawPixel(xcoord, 430 - (low_pass * 0.03), WHITE) ;
-            // printf("%d\n", (int)((fix2float15(low_pass) * 0.03)));
+            drawPixel(xcoord, 431 - (low_pass * 0.03), WHITE) ;
+            // printf("%d\n", (int)((fix2float15(low_pass))));
 
             // Draw top plot
-            drawPixel(xcoord, 230 - (int)((fix2float15(complementary_angle) - 90.0)*0.8333), WHITE) ;
+            drawPixel(xcoord, 228 - (int)((fix2float15(complementary_angle) - 90.0)*0.8333), WHITE) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
@@ -186,38 +214,6 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             }
         }
     }
-
-    // Draw the static aspects of the display
-    // setTextSize(1) ;
-    // setTextColor(YELLOW);
-
-    // char angle_const[100];
-    // setCursor(10, 10);
-    // sprintf(angle_const, "%s", "Complementary Angle: ");
-    // writeString(angle_const);
-
-    // char low_pass_const[100];
-    // setCursor(10, 20);
-    // sprintf(low_pass_const, "%s", "Low-Passed Motor Command Signal: ");
-    // writeString(low_pass_const);
-
-    // setTextColor(WHITE);
-    // char angle[100];
-    // char low_pass_arr[100];
-    // while (true) {
-    //     // Wait on semaphore
-    //     PT_SEM_WAIT(pt, &vga_semaphore);
-
-    //     setTextColor2(WHITE, BLACK);
-    //     setCursor(140, 10);
-    //     sprintf(angle, "%f", fix2float15(complementary_angle) - 90.0);
-    //     writeString(angle);
-
-    //     setTextColor2(WHITE, BLACK);
-    //     setCursor(200, 20);
-    //     sprintf(low_pass_arr, "%04d", low_pass);
-    //     writeString(low_pass_arr);
-    // }
     // Indicate end of thread
     PT_END(pt);
 }
@@ -226,17 +222,52 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 static PT_THREAD (protothread_serial(struct pt *pt))
 {
     PT_BEGIN(pt) ;
-    static int test_in ;
+    static int test_in = -1 ;
     while(1) {
-        sprintf(pt_serial_out_buffer, "input a duty cycle (0-5000): ");
+        sprintf(pt_serial_out_buffer, "choose 1 to change desired angle, 2 Kp, 3 Kd, 4 Ki: \r\n");
         serial_write ;
-        // spawn a thread to do the non-blocking serial read
         serial_read ;
-        // convert input string to number
         sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-        if (test_in > 5000) continue ;
-        else if (test_in < 0) continue ;
-        else control = test_in ;
+        if ( test_in == 1 ) {
+            sprintf(pt_serial_out_buffer, "input desired angle, 0 to 180 degrees: \r\n");
+            serial_write ;
+            serial_read ;
+            sscanf(pt_serial_in_buffer,"%d", &test_in) ;
+            if ( test_in >= 0 && test_in <= 180 ) {
+                desired_angle = test_in+90 ;
+            }
+            test_in = -1;
+        }
+        else if ( test_in == 2 ) {
+            sprintf(pt_serial_out_buffer, "input Kp, 0 to 100: \r\n");
+            serial_write ;
+            serial_read ;
+            sscanf(pt_serial_in_buffer,"%d", &test_in) ;
+            if ( test_in >= 0 && test_in <= 100 ) {
+                Kp = int2fix15(test_in) ;
+            }
+            test_in = -1;
+        }
+        else if ( test_in == 3 ) {
+            sprintf(pt_serial_out_buffer, "input Kd, 0 to 2000: \r\n");
+            serial_write ;
+            serial_read ;
+            sscanf(pt_serial_in_buffer,"%d", &test_in) ;
+            if ( test_in >= 0 && test_in <= 2000 ) {
+                Kd = int2fix15(test_in) ;
+            }
+            test_in = -1;
+        }
+        else if ( test_in == 4 ) {
+            sprintf(pt_serial_out_buffer, "input Ki, 0 to 0.1: \r\n");
+            serial_write ;
+            serial_read ;
+            sscanf(pt_serial_in_buffer,"%f", &test_in) ;
+            if ( test_in >= 0 && test_in <= 0.1 ) {
+                Ki = float2fix15(test_in) ;
+            }
+            test_in = -1;
+        }
     }
     PT_END(pt) ;
 }
