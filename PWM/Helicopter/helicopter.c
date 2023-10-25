@@ -63,8 +63,8 @@ volatile int control  = 1000;
 volatile int old_control = 0 ;
 volatile int low_pass = 0 ;
 
-volatile fix15 complementary_angle = int2fix15(0);
-volatile fix15 prev_complementary_angle = int2fix15(0);
+volatile fix15 complementary_angle = int2fix15(90);
+volatile fix15 prev_complementary_angle = int2fix15(90);
 fix15 PI = float2fix15(3.15149);
 
 volatile fix15 filtered_ay = int2fix15(0);
@@ -93,6 +93,8 @@ int oppositeSigns(fix15 x, fix15 y) {
     } return 0; // False
 }
 
+
+volatile int ii = 0;
 // PWM interrupt service routine
 void on_pwm_wrap() {
     // Clear the interrupt flag that brought us here
@@ -108,20 +110,33 @@ void on_pwm_wrap() {
     // NO SMALL ANGLE APPROXIMATION
     filtered_ay = filtered_ay + ((acceleration[1] - filtered_ay)>>4) ;
     filtered_az = filtered_az + ((acceleration[2] - filtered_az)>>4) ;
-    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ay, filtered_az) + 3.14159), oneeightyoverpi);
+    fix15 accel_angle = multfix15(float2fix15(atan2(-filtered_ay, filtered_az)) + PI, oneeightyoverpi);
 
     low_pass = low_pass + ((control - low_pass)>>4);
 
     // Gyro angle delta (measurement times timestep) (15.16 fixed point)
-    fix15 gyro_angle_delta = multfix15(gyro[2], zeropt001) ;
+    fix15 gyro_angle_delta = multfix15(gyro[0], zeropt001) ;
 
     // Complementary angle (degrees - 15.16 fixed point)
     complementary_angle = multfix15(complementary_angle - gyro_angle_delta, zeropt999) + multfix15(accel_angle, zeropt001);
 
+    // int curr_control = control;
+    // float error = desired_angle - fix2float15(complementary_angle);
+    
+    // curr_control += error / 50.0;
+
+    // curr_control = max(min(5000, curr_control), 0);
+    // control = curr_control;
+
     int temp_ctrl = 0;
     // error angle = desired_angle - previous complementary_angle
     error_ang = int2fix15(desired_angle) - complementary_angle;
-    // printf("error: %d\n", fix2int15(error_ang));
+
+    // ++ii;
+    // ii = (ii >= 100) ? 0 : ii;
+    // if (ii == 0) {
+    //     printf("comp: %f, desired: %d\n", fix2float15(complementary_angle), desired_angle);
+    // }
     
     proportional_cntl = multfix15(Kp, error_ang);
     differential_cntl = multfix15(Kd, error_ang - last_err);
@@ -137,12 +152,9 @@ void on_pwm_wrap() {
 
     // add 3 controls together
     temp_ctrl = fix2int15(proportional_cntl) + fix2int15(differential_cntl) + fix2int15(integral_cntl);
+    // temp_ctrl = fix2int15(proportional_cntl);
     // clamp control to between 0 and 5k
-    if (temp_ctrl > 5000) {
-        temp_ctrl = 5000;
-    } else if (temp_ctrl < 0) {
-        temp_ctrl = 0;
-    }
+    temp_ctrl = min(max(0, temp_ctrl), 5000);
     // set control to the new control
     control = temp_ctrl;
     last_err = error_ang;
