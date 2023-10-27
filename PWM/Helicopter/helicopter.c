@@ -74,11 +74,9 @@ volatile int desired_angle = 86;
 volatile fix15 error_ang = int2fix15(0);
 volatile fix15 last_err = int2fix15(0);
 
-fix15 Kt = float2fix15(0.0000000005);
-
-fix15 Kp = int2fix15(20);
-fix15 Kd = int2fix15(2000);
-fix15 Ki = float2fix15(0.03125);
+fix15 Kp = int2fix15(360);
+fix15 Kd = int2fix15(28000);
+fix15 Ki = float2fix15(0.95);
 
 volatile fix15 proportional_cntl = int2fix15(0);
 volatile fix15 differential_cntl = int2fix15(0);
@@ -87,14 +85,17 @@ fix15 motor_lp = float2fix15(0.95);
 fix15 dd = float2fix15(0.005);
 
 
+volatile int ii = 0;
+
 int oppositeSigns(fix15 x, fix15 y) {
-    if ( (fix2int15(x) ^ fix2int15(y)) < 0 ) {
+    if ( (x > 0 && y < 0) || (x < 0 && y > 0) ) {
         return 1; // True
     } return 0; // False
 }
 
+fix15 comp_buffer[5];
+volatile int buffer_idx = 0;
 
-volatile int ii = 0;
 // PWM interrupt service routine
 void on_pwm_wrap() {
     // Clear the interrupt flag that brought us here
@@ -120,23 +121,12 @@ void on_pwm_wrap() {
     // Complementary angle (degrees - 15.16 fixed point)
     complementary_angle = multfix15(complementary_angle - gyro_angle_delta, zeropt999) + multfix15(accel_angle, zeropt001);
 
-    // int curr_control = control;
-    // float error = desired_angle - fix2float15(complementary_angle);
-    
-    // curr_control += error / 50.0;
-
-    // curr_control = max(min(5000, curr_control), 0);
-    // control = curr_control;
-
     int temp_ctrl = 0;
     // error angle = desired_angle - previous complementary_angle
+    // error_ang = int2fix15(desired_angle) - comp_buffer[buffer_idx];
+    // comp_buffer[buffer_idx] = complementary_angle;
+    // buffer_idx = (buffer_idx + 1) % 5;
     error_ang = int2fix15(desired_angle) - complementary_angle;
-
-    // ++ii;
-    // ii = (ii >= 100) ? 0 : ii;
-    // if (ii == 0) {
-    //     printf("comp: %f, desired: %d\n", fix2float15(complementary_angle), desired_angle);
-    // }
     
     proportional_cntl = multfix15(Kp, error_ang);
     differential_cntl = multfix15(Kd, error_ang - last_err);
@@ -145,7 +135,7 @@ void on_pwm_wrap() {
     // integral ctrl is accumulator
     // set to 0 if sign of errors different
     if (oppositeSigns(error_ang, last_err) == 1) {
-        integral_cntl = 0;
+        integral_cntl = int2fix15(0);
     }
 
     integral_cntl = multfix15(Ki, integral_cntl);
@@ -269,31 +259,32 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             test_in = -1;
         }
         else if ( test_in == 2 ) {
-            sprintf(pt_serial_out_buffer, "input Kp, 0 to 100: \r\n");
+            sprintf(pt_serial_out_buffer, "input Kp, 100 to 200: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            if ( test_in >= 0 && test_in <= 100 ) {
+            if ( test_in >= 200 && test_in <= 350 ) {
                 Kp = int2fix15(test_in) ;
             }
             test_in = -1;
         }
         else if ( test_in == 3 ) {
-            sprintf(pt_serial_out_buffer, "input Kd, 0 to 1000: \r\n");
+            sprintf(pt_serial_out_buffer, "input Kd, 5000 to 30000: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            if ( test_in >= 0 && test_in <= 1000 ) {
+            if ( test_in >= 5000 && test_in <= 32000 ) {
                 Kd = int2fix15(test_in) ;
             }
             test_in = -1;
         }
         else if ( test_in == 4 ) {
-            sprintf(pt_serial_out_buffer, "input Ki, 0 to 0.1: \r\n");
+            // sprintf(pt_serial_out_buffer, "input Ki, 0 to 0.1: \r\n");
+            sprintf(pt_serial_out_buffer, "input Ki, 0 to 1: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%f", &test_in) ;
-            if ( test_in >= 0 && test_in <= 0.1 ) {
+            if ( test_in >= 0 && test_in <= 1 ) {
                 Ki = float2fix15(test_in) ;
             }
             test_in = -1;
