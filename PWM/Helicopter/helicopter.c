@@ -70,13 +70,13 @@ fix15 PI = float2fix15(3.15149);
 volatile fix15 filtered_ay = int2fix15(0);
 volatile fix15 filtered_az = int2fix15(1);
 
-volatile int desired_angle = 86;
+volatile int desired_angle = 90;
 volatile fix15 error_ang = int2fix15(0);
 volatile fix15 last_err = int2fix15(0);
 
-fix15 Kp = int2fix15(360);
-fix15 Kd = int2fix15(28000);
-fix15 Ki = float2fix15(0.95);
+fix15 Kp = int2fix15(300);
+fix15 Kd = int2fix15(30000);
+fix15 Ki = float2fix15(0.55);
 
 volatile fix15 proportional_cntl = int2fix15(0);
 volatile fix15 differential_cntl = int2fix15(0);
@@ -127,6 +127,10 @@ void on_pwm_wrap() {
     // comp_buffer[buffer_idx] = complementary_angle;
     // buffer_idx = (buffer_idx + 1) % 5;
     error_ang = int2fix15(desired_angle) - complementary_angle;
+
+
+    
+    
     
     proportional_cntl = multfix15(Kp, error_ang);
     differential_cntl = multfix15(Kd, error_ang - last_err);
@@ -140,11 +144,19 @@ void on_pwm_wrap() {
 
     integral_cntl = multfix15(Ki, integral_cntl);
 
+    ii++;
+    if (ii > 50) {
+        printf("Desired: %d, Complementary: %d, error ang: %d\n", desired_angle, fix2int15(complementary_angle), fix2int15(error_ang));
+        printf("Proportional: %d, Differential: %d, Integral: %d\n", fix2int15(proportional_cntl), fix2int15(differential_cntl), fix2int15(integral_cntl));
+        ii = 0;
+    }
+
     // add 3 controls together
     temp_ctrl = fix2int15(proportional_cntl) + fix2int15(differential_cntl) + fix2int15(integral_cntl);
     // temp_ctrl = fix2int15(proportional_cntl);
     // clamp control to between 0 and 5k
     temp_ctrl = min(max(0, temp_ctrl), 5000);
+    
     // set control to the new control
     control = temp_ctrl;
     last_err = error_ang;
@@ -263,9 +275,10 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            if ( test_in >= 200 && test_in <= 350 ) {
-                Kp = int2fix15(test_in) ;
-            }
+            // if ( test_in >= 200 && test_in <= 350 ) {
+            //     Kp = int2fix15(test_in) ;
+            // }
+            Kp = int2fix15(test_in) ;
             test_in = -1;
         }
         else if ( test_in == 3 ) {
@@ -273,9 +286,10 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            if ( test_in >= 5000 && test_in <= 32000 ) {
-                Kd = int2fix15(test_in) ;
-            }
+            // if ( test_in >= 5000 && test_in <= 32000 ) {
+            //     Kd = int2fix15(test_in) ;
+            // }
+            Kd = int2fix15(test_in) ;
             test_in = -1;
         }
         else if ( test_in == 4 ) {
@@ -284,9 +298,10 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%f", &test_in) ;
-            if ( test_in >= 0 && test_in <= 1 ) {
-                Ki = float2fix15(test_in) ;
-            }
+            // if ( test_in >= 0 && test_in <= 1 ) {
+            //     Ki = float2fix15(test_in) ;
+            // }
+            Ki = float2fix15(test_in) ;
             test_in = -1;
         }
     }
