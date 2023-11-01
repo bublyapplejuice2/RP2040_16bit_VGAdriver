@@ -226,7 +226,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             // printf("%d\n", (int)((fix2float15(low_pass))));
 
             // Draw top plot
-            drawPixel(xcoord, 241 - ((complementary_angle - 90.0) * 0.8333), RED) ;
+            drawPixel(xcoord, 230 - ((complementary_angle - 90.0) * 0.8333), RED) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
