@@ -74,9 +74,9 @@ volatile int desired_angle = 86;
 volatile signed int error_ang = 0;
 volatile signed int last_err = 0;
 
-volatile fix15 Kp = int2fix15(200);
-volatile fix15 Kd = int2fix15(18000);
-volatile float Ki = 0.03;
+volatile int Kp = 110;
+volatile int Kd = 1000;
+volatile float Ki = 0;
 
 volatile int proportional_cntl = 0;
 volatile int differential_cntl = 0;
@@ -137,15 +137,14 @@ void on_pwm_wrap() {
         temp_error_ang = 100;
     }
  
-    proportional_cntl = fix2int15(Kp) * temp_error_ang;
-    differential_cntl = fix2int15(Kd) * (error_ang - last_err);
+    proportional_cntl = Kp * temp_error_ang;
+    differential_cntl = Kd * (error_ang - last_err);
 
     accumulator += error_ang;
 
     // integral ctrl is accumulator
     // set to 0 if sign of errors different
     if (oppositeSigns(error_ang, last_err) == 1) {
-        printf("hi");
         accumulator = 0;
     }
 
@@ -236,10 +235,9 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 
             // Draw bottom plot (multiply by 120 to scale from +/-2 to +/-250)
             drawPixel(xcoord, 431 - (low_pass * 0.03), WHITE) ;
-            // printf("%d\n", (int)((fix2float15(low_pass))));
 
             // Draw top plot
-            drawPixel(xcoord, 225 - (int)((fix2float15(complementary_angle) - 86.0)*0.8333), WHITE) ;
+            drawPixel(xcoord, 228 - (int)((fix2float15(complementary_angle) - 86.0)*0.8333), RED) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
@@ -258,13 +256,14 @@ static PT_THREAD (protothread_vga(struct pt *pt))
 static PT_THREAD (protothread_button(struct pt *pt))
 {
     PT_BEGIN(pt) ;
-    volatile int fsm = 1;
+    volatile int prev_gpio = 1;
     while(1){
-        if (gpio_get(11) == 0 && fsm == 1) {
+        if (gpio_get(11) == 0 && prev_gpio == 1) {
             printf("beginning program sequence\n");
             desired_angle = 86;
+            prev_gpio = 0;
         }
-        else if (gpio_get(11) == 1 && fsm == 0) {
+        else if (gpio_get(11) == 1 && prev_gpio == 0) {
             // begin the sequence
             printf("desired: 90\n");
             desired_angle = 176;
@@ -279,8 +278,8 @@ static PT_THREAD (protothread_button(struct pt *pt))
             desired_angle = 176;
             sleep_ms(5000);
             printf("end program sequence\n");
+            prev_gpio = 1;
         }
-        fsm = gpio_get(11);
     }
     PT_END(pt) ;
 }
@@ -312,10 +311,7 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            // if ( test_in >= 200 && test_in <= 350 ) {
-            //     Kp = int2fix15(test_in) ;
-            // }
-            Kp = int2fix15(test_in) ;
+            Kp = test_in ;
             test_in = -1;
         }
         else if ( test_in == 3 ) {
@@ -323,22 +319,16 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            // if ( test_in >= 5000 && test_in <= 32000 ) {
-            //     Kd = int2fix15(test_in) ;
-            // }
-            Kd = int2fix15(test_in) ;
+            Kd = test_in ;
             test_in = -1;
         }
         else if ( test_in == 4 ) {
             // sprintf(pt_serial_out_buffer, "input Ki, 0 to 0.1: \r\n");
-            sprintf(pt_serial_out_buffer, "input Ki, 0 to 1: \r\n");
+            sprintf(pt_serial_out_buffer, "input Ki, 0 to  1: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%f", &test_in) ;
-            // if ( test_in >= 0 && test_in <= 1 ) {
-            //     Ki = float2fix15(test_in) ;
-            // }
-            Ki = float2fix15(test_in) ;
+            Ki = test_in ;
             test_in = -1;
         }
     }
