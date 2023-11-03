@@ -74,8 +74,8 @@ volatile int desired_angle = 86;
 volatile signed int error_ang = 0;
 volatile signed int last_err = 0;
 
-volatile fix15 Kp = int2fix15(50);
-volatile fix15 Kd = int2fix15(28000);
+volatile int Kp = 50;
+volatile int Kd = 32000;
 volatile float Ki = 0.06;
 
 volatile int proportional_cntl = 0;
@@ -137,8 +137,8 @@ void on_pwm_wrap() {
         temp_error_ang = 100;
     }
  
-    proportional_cntl = fix2int15(Kp) * temp_error_ang;
-    differential_cntl = fix2int15(Kd) * (error_ang - last_err);
+    proportional_cntl = Kp * temp_error_ang;
+    differential_cntl = Kd * (error_ang - last_err);
 
     accumulator += error_ang;
 
@@ -275,8 +275,20 @@ static PT_THREAD (protothread_button(struct pt *pt))
             desired_angle = 206;
             sleep_ms(5000);
             printf("desired: 60\n");
+            desired_angle = 199;
+            sleep_ms(250);
+            desired_angle = 191;
+            sleep_ms(250);
+            desired_angle = 176;
+            sleep_ms(250);
+            desired_angle = 167;
+            sleep_ms(1000);
+            desired_angle = 159;
+            sleep_ms(250);
+            desired_angle = 149;
+            sleep_ms(250);
             desired_angle = 146;
-            sleep_ms(7000);
+            sleep_ms(3500);
             printf("desired: 90\n");
             desired_angle = 176;
             sleep_ms(5000);
@@ -310,36 +322,26 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             test_in = -1;
         }
         else if ( test_in == 2 ) {
-            sprintf(pt_serial_out_buffer, "input Kp, 100 to 200: \r\n");
+            sprintf(pt_serial_out_buffer, "input Kp: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            // if ( test_in >= 200 && test_in <= 350 ) {
-            //     Kp = int2fix15(test_in) ;
-            // }
-            Kp = int2fix15(test_in) ;
+            Kp = test_in ;
             test_in = -1;
         }
         else if ( test_in == 3 ) {
-            sprintf(pt_serial_out_buffer, "input Kd, 5000 to 30000: \r\n");
+            sprintf(pt_serial_out_buffer, "input Kd: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-            // if ( test_in >= 5000 && test_in <= 32000 ) {
-            //     Kd = int2fix15(test_in) ;
-            // }
-            Kd = int2fix15(test_in) ;
+            Kd = test_in ;
             test_in = -1;
         }
         else if ( test_in == 4 ) {
-            // sprintf(pt_serial_out_buffer, "input Ki, 0 to 0.1: \r\n");
             sprintf(pt_serial_out_buffer, "input Ki, 0 to 1: \r\n");
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%f", &test_in) ;
-            // if ( test_in >= 0 && test_in <= 1 ) {
-            //     Ki = float2fix15(test_in) ;
-            // }
             Ki = test_in ;
             test_in = -1;
         }
