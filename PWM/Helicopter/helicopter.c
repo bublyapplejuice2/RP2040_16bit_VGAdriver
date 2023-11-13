@@ -63,30 +63,31 @@ volatile int control  = 1000;
 volatile int old_control = 0 ;
 volatile int low_pass = 0 ;
 
-volatile int complementary_angle = 90;
-volatile int prev_complementary_angle = 90;
+volatile fix15 complementary_angle = int2fix15(86);
+volatile fix15 prev_complementary_angle = int2fix15(86);
 fix15 PI = float2fix15(3.15149);
 
 volatile fix15 filtered_ay = int2fix15(0);
 volatile fix15 filtered_az = int2fix15(1);
 
-volatile int desired_angle = 90;
-volatile int error_ang = 0;
-volatile int last_err = 0;
+volatile int desired_angle = 86;
+volatile signed int error_ang = 0;
+volatile signed int last_err = 0;
 
-int Kp = 100;
-int Kd = 3000;
-fix15 Ki = float2fix15(0.15);
+volatile fix15 Kp = int2fix15(200);
+volatile fix15 Kd = int2fix15(18000);
+volatile float Ki = 0.03;
 
 volatile int proportional_cntl = 0;
 volatile int differential_cntl = 0;
-volatile int integral_cntl = 0;
+volatile int integral_cntl;
+volatile int accumulator;
 fix15 motor_lp = float2fix15(0.95);
 fix15 dd = float2fix15(0.005);
 
 volatile int ii = 0;
 
-int oppositeSigns(int x, int y) {
+int oppositeSigns(signed int x, signed int y) {
     if ( (x > 0 && y < 0) || (x < 0 && y > 0) ) {
         return 1; // True
     } return 0; // False
@@ -121,25 +122,36 @@ void on_pwm_wrap() {
     complementary_angle = (0.999 * (complementary_angle - fix2int15(gyro_angle_delta))) + (0.001 * fix2int15(accel_angle));
 
     int temp_ctrl = 0;
-    error_ang = desired_angle - complementary_angle;
+    // error angle = desired_angle - previous complementary_angle
+    // error_ang = int2fix15(desired_angle) - comp_buffer[buffer_idx];
+    // comp_buffer[buffer_idx] = complementary_angle;
+    // buffer_idx = (buffer_idx + 1) % 5;
+    error_ang = desired_angle - fix2int15(complementary_angle);
+
+    int temp_error_ang = error_ang;
     
-    proportional_cntl = Kp * error_ang;
-    differential_cntl = Kd * (error_ang - last_err);
-    integral_cntl += error_ang;
+    if (temp_error_ang < -100) {
+        temp_error_ang = -100;
+    } else if (temp_error_ang > 100) {
+        temp_error_ang = 100;
+    }
+ 
+    proportional_cntl = fix2int15(Kp) * temp_error_ang;
+    differential_cntl = fix2int15(Kd) * (error_ang - last_err);
+
+    accumulator += error_ang;
 
     // integral ctrl is accumulator
     // set to 0 if sign of errors different
     if (oppositeSigns(error_ang, last_err) == 1) {
-        integral_cntl = 0;
+        printf("hi");
+        accumulator = 0;
     }
 
-    integral_cntl = fix2float15(Ki) * integral_cntl;
+    integral_cntl = Ki * accumulator;
 
-    ii++;
-    if (ii > 50) {
-        printf("Desired: %d, Complementary: %d, error ang: %d\n", desired_angle, complementary_angle, error_ang);
-        printf("Proportional: %d, Differential: %d, Integral: %d\n", proportional_cntl, differential_cntl, integral_cntl);
-        ii = 0;
+    if (integral_cntl > 5000) {
+        integral_cntl = 5000;
     }
 
     // add 3 controls together
@@ -226,7 +238,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             // printf("%d\n", (int)((fix2float15(low_pass))));
 
             // Draw top plot
-            drawPixel(xcoord, 230 - ((complementary_angle - 90.0) * 0.8333), RED) ;
+            drawPixel(xcoord, 225 - (int)((fix2float15(complementary_angle) - 86.0)*0.8333), WHITE) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
@@ -240,6 +252,39 @@ static PT_THREAD (protothread_vga(struct pt *pt))
     // Indicate end of thread
     PT_END(pt);
 }
+
+// Button input thread
+static PT_THREAD (protothread_button(struct pt *pt))
+{
+    PT_BEGIN(pt) ;
+    volatile int fsm = 1;
+    while(1){
+        if (gpio_get(11) == 0 && fsm == 1) {
+            printf("beginning program sequence\n");
+            desired_angle = 86;
+        }
+        else if (gpio_get(11) == 1 && fsm == 0) {
+            // begin the sequence
+            printf("desired: 90\n");
+            desired_angle = 176;
+            sleep_ms(5000);
+            printf("desired: 120\n");
+            desired_angle = 206;
+            sleep_ms(5000);
+            printf("desired: 60\n");
+            desired_angle = 146;
+            sleep_ms(5000);
+            printf("desired: 90\n");
+            desired_angle = 176;
+            sleep_ms(5000);
+            printf("end program sequence\n");
+        }
+        fsm = gpio_get(11);
+    }
+    PT_END(pt) ;
+}
+
+
 
 // User input thread
 static PT_THREAD (protothread_serial(struct pt *pt))
@@ -257,7 +302,7 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
             if ( test_in >= 0 && test_in <= 180 ) {
-                desired_angle = test_in+90 ;
+                desired_angle = test_in+86 ;
             }
             test_in = -1;
         }
@@ -301,7 +346,7 @@ static PT_THREAD (protothread_serial(struct pt *pt))
 
 // Entry point for core 1
 void core1_entry() {
-    pt_add_thread(protothread_vga) ;
+    pt_add_thread(protothread_button) ;
     pt_schedule_start ;
 }
 
@@ -318,6 +363,10 @@ int main() {
     gpio_set_function(SCL_PIN, GPIO_FUNC_I2C) ;
     gpio_pull_up(SDA_PIN) ;
     gpio_pull_up(SCL_PIN) ;
+
+    gpio_init(11);
+    gpio_pull_up(11);
+    gpio_set_input_enabled(11, 1);
 
     // MPU6050 initialization
     mpu6050_reset();
@@ -352,6 +401,7 @@ int main() {
     multicore_launch_core1(core1_entry);
 
     pt_add_thread(protothread_serial) ;
+    pt_add_thread(protothread_vga) ;
     pt_schedule_start ;
 
 }
