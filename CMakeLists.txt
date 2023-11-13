@@ -13,7 +13,7 @@ set(HUNTER_PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
 pico_sdk_init()
 
 # Add multi example
-add_subdirectory(Final_Project)
+add_subdirectory(Ray_Tracer)
 add_subdirectory(PWM)
 add_subdirectory(VGA_Graphics)
 add_subdirectory(Human_Input)

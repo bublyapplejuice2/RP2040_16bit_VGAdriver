@@ -34,8 +34,10 @@ pulse:
 ; BACKPORCH
 backporch:
     set pins, 1 [31]    ; High for back porch (32 cycles)
-    set pins, 1 [12]    ; High for back porch (45 cycles)
-    irq 0       [1]     ; Set IRQ to signal end of line (47 cycles)
+    set pins, 1 [31]    ; High for back porch (64 cycles)
+    set pins, 1 [31]    ; High for back porch (64 cycles)
+    set pins, 1 [30]    ; High for back porch (64 cycles)
+    irq 0       [1]     ; Set IRQ to signal end of line (87 cycles)
 .wrap
 
 
@@ -55,7 +57,7 @@ static inline void hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_set_pins(&c, pin, 1);
 
     // Set clock division (div by 5 for 25 MHz state machine)
-    sm_config_set_clkdiv(&c, 5) ;
+    sm_config_set_clkdiv(&c, 7) ;
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);

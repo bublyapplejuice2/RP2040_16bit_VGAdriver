@@ -26,10 +26,7 @@ activefront:
     jmp x-- activefront           ; Remain in active mode, decrementing counter
 
 ; FRONTPORCH
-set y, 21                          ;
-frontporch:
-    wait 1 irq 0                  ;
-    jmp y-- frontporch            ;
+wait 1 irq 0                  ;
 
 ; SYNC PULSE
 set pins, 0                       ; Set pin low

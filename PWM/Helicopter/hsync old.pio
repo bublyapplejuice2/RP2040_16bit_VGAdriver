@@ -20,32 +20,22 @@
 pull block              ; Pull from FIFO to OSR (only happens once)
 .wrap_target            ; Program wraps to here
 
-; ACTIVE
-mov x, osr                        ; Copy value from OSR to x scratch register
-activefront:
-    wait 1 irq 0                  ; Wait for hsync to go high
-    irq 1                         ; Signal that we're in active mode
-    jmp x-- activefront           ; Remain in active mode, decrementing counter
-
-; FRONTPORCH
-set y, 23                          ;
-frontporch:
-    wait 1 irq 0                  ;
-    jmp y-- frontporch            ;
+; ACTIVE + FRONTPORCH
+mov x, osr              ; Copy value from OSR to x scratch register
+activeporch:
+   jmp x-- activeporch  ; Remain high in active mode and front porch
 
 ; SYNC PULSE
 pulse:
     set pins, 0 [31]    ; Low for hsync pulse (32 cycles)
     set pins, 0 [31]    ; Low for hsync pulse (64 cycles)
-    set pins, 0 [7]    ; Low for hsync pulse (96 cycles)
+    set pins, 0 [31]    ; Low for hsync pulse (96 cycles)
 
 ; BACKPORCH
 backporch:
     set pins, 1 [31]    ; High for back porch (32 cycles)
-    set pins, 1 [31]    ; High for back porch (64 cycles)
-    set pins, 1 [31]    ; High for back porch (96 cycles)
-    set pins, 1 [30]    ; High for back porch (128 cycles)
-    irq 0       [1]     ; Set IRQ to signal end of line (128 cycles)
+    set pins, 1 [12]    ; High for back porch (45 cycles)
+    irq 0       [1]     ; Set IRQ to signal end of line (47 cycles)
 .wrap
 
 
