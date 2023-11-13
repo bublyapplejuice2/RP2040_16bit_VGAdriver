@@ -226,6 +226,7 @@ static PT_THREAD (protothread_vga(struct pt *pt))
         PT_SEM_WAIT(pt, &vga_semaphore);
         // Increment drawspeed controller
         throttle += 1 ;
+        sleep_ms(5);
         // If the controller has exceeded a threshold, draw
         if (throttle >= threshold) { 
             // Zero drawspeed controller
