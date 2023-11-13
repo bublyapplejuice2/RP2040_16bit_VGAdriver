@@ -32,7 +32,7 @@
 
 
 // User input thread
-static PT_THREAD (protothread_serial(struct pt *pt))
+static PT_THREAD (protothread_serial(struct pt *pt``))
 {
     PT_BEGIN(pt) ;
     static unsigned int test_in = 0 ;

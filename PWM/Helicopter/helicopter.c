@@ -326,12 +326,6 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-<<<<<<< HEAD
-            // if ( test_in >= 200 && test_in <= 350 ) {
-            //     Kp = int2fix15(test_in) ;
-            // }
-=======
->>>>>>> lab3
             Kp = test_in ;
             test_in = -1;
         }
@@ -340,12 +334,6 @@ static PT_THREAD (protothread_serial(struct pt *pt))
             serial_write ;
             serial_read ;
             sscanf(pt_serial_in_buffer,"%d", &test_in) ;
-<<<<<<< HEAD
-            // if ( test_in >= 5000 && test_in <= 32000 ) {
-            //     Kd = int2fix15(test_in) ;
-            // }
-=======
->>>>>>> lab3
             Kd = test_in ;
             test_in = -1;
         }
