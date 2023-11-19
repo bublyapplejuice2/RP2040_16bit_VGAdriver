@@ -14,13 +14,11 @@ pico_sdk_init()
 
 # Add multi example
 add_subdirectory(Ray_Tracer)
+add_subdirectory(Memory)
 add_subdirectory(PWM)
 add_subdirectory(VGA_Graphics)
 add_subdirectory(Human_Input)
-add_subdirectory(Audio)
-add_subdirectory(Sensors)
 add_subdirectory(Basic_Demos)
-add_subdirectory(Stepper_Motors)
 add_subdirectory(Networking)
 
 add_compile_options(-Wall
