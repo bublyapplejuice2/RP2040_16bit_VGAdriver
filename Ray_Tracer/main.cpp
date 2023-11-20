@@ -17,7 +17,7 @@
 // #include "material.h"
 // #include "sphere.h"
 
-#include "vga_graphics.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "pico/stdlib.h"
@@ -122,55 +122,51 @@ void set_color(ushort color) {
 }
 
 void incr_color(uint gpio, uint32_t events) {
-    color++;
-    gpio_set_dir(21, GPIO_OUT);
-    gpio_set_dir(22, GPIO_OUT);
+    color+=80;
     count++;
+    set_color(color);
 }
 
 int main(void) {
+    gpio_init(22);
+    while (true) {
+        gpio_put(22, 0);
+        sleep_ms(5);
+        gpio_put(22, 1);
+    }
+
     set_sys_clock_khz(258000, true);
     stdio_init_all();
-    initVGA();
+    
 
-    for (int i = 0; i<16; i++) {
+    // initialize GPIO pin as output
+    gpio_init(21);
+    gpio_set_dir(21, GPIO_IN);
+    gpio_pull_up(21);
+
+    gpio_init(22);
+    gpio_set_dir(22, GPIO_OUT);
+
+    // set pin 22 to low
+    gpio_put(22, 0);
+
+    for (ushort i = 0; i < 16; i++) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_OUT);
     }
 
-    gpio_init(21);
-    gpio_set_irq_enabled_with_callback(21, GPIO_IRQ_EDGE_RISE, true, &incr_color);
-    gpio_init(22);
+    set_color(0);
+    gpio_set_irq_enabled_with_callback(21, GPIO_IRQ_EDGE_FALL, true, &incr_color);
 
+    // total pixels = 600 x 800 = 480000
+    while (count < 480000 ) {
+        ;
+    }
 
+    gpio_put(22, 1);
     
-    while (count < 480000) {
-        if (color < 64000) {
-            set_color(color);
-            gpio_set_dir(21, GPIO_IN);
-            // Send interrupt to other Pico to go write enable
-            gpio_put(21, 1);
-            // Send interrupt to other Pico to increment address
-            gpio_put(22, 1);
-            gpio_set_dir(22, GPIO_IN);
-            
-        } else {
-            // If color is 64000, then set back to 0
-            color = 0;
-        }
-    }
-
     for (int i = 0; i<16; i++) {
-        gpio_init(i);
         gpio_set_dir(i, GPIO_IN);
-    }
-
-    gpio_init(26);
-    gpio_set_dir(26, GPIO_OUT);
-    gpio_put(26, 1);
-
-    while (true) {
-        sleep_ms(5000);
     }
     return 0;
 }

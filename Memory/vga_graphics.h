@@ -20,7 +20,7 @@
 
 
 // Give the I/O pins that we're using some names that make sense - usable in main()
-enum vga_pins {HSYNC=16, VSYNC, RED_PIN, GREEN_PIN, BLUE_PIN} ;
+enum vga_pins {HSYNC=27, VSYNC, RED_PIN, GREEN_PIN, BLUE_PIN} ;
 
 // We can only produce 8 (3-bit) colors, so let's give them readable names - usable in main()
 enum colors {BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE} ;
