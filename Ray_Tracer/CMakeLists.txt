@@ -1,7 +1,5 @@
 add_executable(ray_tracer)
 
-
-
 # must match with executable name and source file names
 target_sources(ray_tracer PRIVATE main.cpp stb_image.h camera.h color.h hittable.h hittable_list.h interval.h material.h ray.h rtw_stb_image.h rtweekend.h sphere.h vec3.h )
 
