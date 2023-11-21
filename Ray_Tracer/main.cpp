@@ -28,8 +28,9 @@ typedef unsigned short ushort;
 volatile ushort color = 0;
 volatile int count = 0;
 
-// #include "pt_cornell_rp2040_v1.h"
+#define MAX_GPIO_PINS 29
 
+// #include "pt_cornell_rp2040_v1.h"
 
 // R = 0-4
 // G = 5-10
@@ -83,10 +84,6 @@ void get_gpio_arr(int (&gpio_arr)[19], int (&mem_arr)[19]) {
 }
 
 void set_color(ushort color) {
-    if (color < 0 || color >= 65536) {
-        printf("color out of range");
-        return;
-    }
     gpio_put(0, color & 1);
     color >>= 1;
     gpio_put(1, color & 1);
@@ -122,50 +119,72 @@ void set_color(ushort color) {
 }
 
 void incr_color(uint gpio, uint32_t events) {
-    color+=80;
-    count++;
-    set_color(color);
+    color ++;
+    ushort temp = color;
+    count ++;
+    gpio_put(25, !gpio_get(25)) ;
+    
+    gpio_put(0, temp & 1);
+    temp >>= 1;
+    gpio_put(1, temp & 1);
+    temp >>= 1;
+    gpio_put(2, temp & 1);
+    temp >>= 1;
+    gpio_put(3, temp & 1);
+    temp >>= 1;
+    gpio_put(4, temp & 1);
+    temp >>= 1;
+    gpio_put(5, temp & 1);
+    temp >>= 1;
+    gpio_put(6, temp & 1);
+    temp >>= 1;
+    gpio_put(7, temp & 1);
+    temp >>= 1;
+    gpio_put(8, temp & 1);
+    temp >>= 1;
+    gpio_put(9, temp & 1);
+    temp >>= 1;
+    gpio_put(10, temp & 1);
+    temp >>= 1;
+    gpio_put(11, temp & 1);
+    temp >>= 1;
+    gpio_put(12, temp & 1);
+    temp >>= 1;
+    gpio_put(13, temp & 1);
+    temp >>= 1;
+    gpio_put(14, temp & 1);
+    temp >>= 1;
+    gpio_put(15, temp & 1);
+    temp >>= 1;
 }
 
 int main(void) {
-    gpio_init(22);
-    while (true) {
-        gpio_put(22, 0);
-        sleep_ms(5);
-        gpio_put(22, 1);
-    }
-
-    set_sys_clock_khz(258000, true);
+    set_sys_clock_khz(264000, true);
     stdio_init_all();
     
-
-    // initialize GPIO pin as output
-    gpio_init(21);
-    gpio_set_dir(21, GPIO_IN);
-    gpio_pull_up(21);
-
-    gpio_init(22);
-    gpio_set_dir(22, GPIO_OUT);
-
-    // set pin 22 to low
-    gpio_put(22, 0);
-
-    for (ushort i = 0; i < 16; i++) {
+    for (int i = 0; i < 16; ++i) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_OUT);
     }
-
     set_color(0);
-    gpio_set_irq_enabled_with_callback(21, GPIO_IRQ_EDGE_FALL, true, &incr_color);
+
+    // initialize GPIO pin as output
+    gpio_init(25);
+    gpio_set_dir(25, GPIO_OUT);
+
+    gpio_init(21);
+    gpio_set_dir(21, GPIO_IN);
+    gpio_set_irq_enabled_with_callback(21, GPIO_IRQ_EDGE_RISE, true, &incr_color);
 
     // total pixels = 600 x 800 = 480000
-    while (count < 480000 ) {
+    while (count < 480000) {
         ;
     }
-
+    gpio_init(22);
+    gpio_set_dir(22, GPIO_OUT);
     gpio_put(22, 1);
     
-    for (int i = 0; i<16; i++) {
+    for (int i = 0; i < 16; i++) {
         gpio_set_dir(i, GPIO_IN);
     }
     return 0;
