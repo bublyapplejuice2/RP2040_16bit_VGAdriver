@@ -3,6 +3,8 @@ add_executable(memory)
 # must match with pio filename and executable name from above
 pico_generate_pio_header(memory ${CMAKE_CURRENT_LIST_DIR}/hsync.pio)
 pico_generate_pio_header(memory ${CMAKE_CURRENT_LIST_DIR}/vsync.pio)
+pico_generate_pio_header(memory ${CMAKE_CURRENT_LIST_DIR}/rgb.pio)
+pico_generate_pio_header(memory ${CMAKE_CURRENT_LIST_DIR}/rgb2.pio)
 
 # must match with executable name and source file names
 target_sources(memory PRIVATE main.cpp vga_graphics.cpp vga_graphics.h)

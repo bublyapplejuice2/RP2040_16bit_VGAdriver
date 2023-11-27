@@ -25,7 +25,7 @@
 #include "hardware/dma.h"
 
 typedef unsigned short ushort;
-volatile ushort color = 0;
+volatile ushort color = 64000;
 volatile int count = 0;
 
 #define MAX_GPIO_PINS 29
@@ -119,7 +119,7 @@ void set_color(ushort color) {
 }
 
 void incr_color(uint gpio, uint32_t events) {
-    color ++;
+    // color ++;
     ushort temp = color;
     count ++;
     gpio_put(25, !gpio_get(25)) ;
@@ -166,7 +166,7 @@ int main(void) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_OUT);
     }
-    set_color(0);
+    set_color(color);
 
     // initialize GPIO pin as output
     gpio_init(25);

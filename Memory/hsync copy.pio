@@ -1,14 +1,11 @@
 ;
 ; Hunter Adams (vha3@cornell.edu)
-; mod by bruce land for lower clock rate (and elim loops)
-; video line frequecy with divider of 79.5 is 31.4 KHz
-; line time 31.8 (versus 31.78 for stnadard)
 ; HSync generation for VGA driver
 
 
 ; Program name
 .program hsync
-; This version DIVIDES 25 MHz by 16!
+
 ; frontporch: 16 clocks (0.64us at 25MHz)
 ; sync pulse: 96 clocks (3.84us at 25MHz)
 ; back porch: 48 clocks (1.92us at 25MHz)
@@ -18,21 +15,33 @@
 ; Low  for 96  cycles (3.84us at 25MHz)
 ; Total period of 800 cycles (32us at 25MHz)
 ;
+
+
+pull block              ; Pull from FIFO to OSR (only happens once)
 .wrap_target            ; Program wraps to here
 
-; 41 divided cycles for active 
-    nop [31]
-    nop [8]
+; ACTIVE + FRONTPORCH
+mov x, osr              ; Copy value from OSR to x scratch register
+activeporch:
+   jmp x-- activeporch  ; Remain high in active mode and front porch
 
 ; SYNC PULSE
-; 4 divided cycles
-    set pins, 0 [3]
+pulse:
+    set pins, 0 [31]    ; Low for hsync pulse (32 cycles)
+    set pins, 0 [31]    ; Low for hsync pulse (64 cycles)
+    set pins, 0 [31]    ; Low for hsync pulse (96 cycles)
 
 ; BACKPORCH
-    set pins, 1  [3]
-    irq 0            ; Set IRQ to signal end of line (47 cycles)
-
+backporch:
+    set pins, 1 [31]    ; High for back porch (32 cycles)
+    set pins, 1 [31]    ; High for back porch (64 cycles)
+    set pins, 1 [31]    ; High for back porch (64 cycles)
+    set pins, 1 [30]    ; High for back porch (64 cycles)
+    irq 0       [1]     ; Set IRQ to signal end of line (87 cycles)
 .wrap
+
+
+
 
 % c-sdk {
 static inline void hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
@@ -48,9 +57,7 @@ static inline void hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_set_pins(&c, pin, 1);
 
     // Set clock division (div by 5 for 25 MHz state machine)
-    //sm_config_set_clkdiv(&c, 5) ;
-    // Set clock division (div by 5 x 16 state machine)
-    sm_config_set_clkdiv(&c, 168) ;
+    sm_config_set_clkdiv(&c, 7) ;
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
@@ -61,11 +68,6 @@ static inline void hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
-
-    //  H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
-    //pio_sm_put_blocking(pio, sm, 655); // 
-    //pio_sm_exec(pio, sm, pio_encode_pull(false, false));
-    //pio_sm_exec(pio, sm, pio_encode_out(pio_y, 32));
 
     // Set the state machine running (commented out so can be synchronized w/ vsync)
     // pio_sm_set_enabled(pio, sm, true);

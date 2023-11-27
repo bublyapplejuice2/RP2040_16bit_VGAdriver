@@ -1,7 +1,6 @@
 ;
 ; Hunter Adams (vha3@cornell.edu)
 ; VSync generation for VGA driver
-;; --- 15 instructions
 
 ; Program name
 .program vsync
@@ -14,22 +13,20 @@
 ;
 ; Code size could be reduced with side setting
 
+
+
+pull block                        ; Pull from FIFO to OSR (only once)
 .wrap_target                      ; Program wraps to here
 
 ; ACTIVE
 mov x, osr                        ; Copy value from OSR to x scratch register
 activefront:
     wait 1 irq 0                  ; Wait for hsync to go high
-    irq 1                         ; Signal first rgb machine that we're in active mode
-    wait 1 irq 0                  ; Wait for hsync to go high
-    irq 2                         ; Signal seconde rgb macinethat we're in active mode
+    irq 1                         ; Signal that we're in active mode
     jmp x-- activefront           ; Remain in active mode, decrementing counter
 
 ; FRONTPORCH
-set y, 9                          ;
-frontporch:
-    wait 1 irq 0                  ;
-    jmp y-- frontporch            ;
+wait 1 irq 0                  ;
 
 ; SYNC PULSE
 set pins, 0                       ; Set pin low
@@ -37,7 +34,7 @@ wait 1 irq 0                      ; Wait for one line
 wait 1 irq 0                      ; Wait for a second line
 
 ; BACKPORCH
-set y, 31                         ; First part of back porch into y scratch register (and delays a cycle)
+set y, 20                         ; First part of back porch into y scratch register (and delays a cycle)
 ;set pins, 1                      ; Raise high for back porch (delaying a set cycle) - REPLACED WITH SIDESET
 backporch:
     wait 1 irq 0   side 1         ; Wait for hsync to go high - SIDESET REPLACEMENT HERE
@@ -64,7 +61,7 @@ static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_sideset_pins(&c, pin);
 
     // Set clock division (div by 5 for 25 MHz state machine)
-    sm_config_set_clkdiv(&c, 25) ;
+    sm_config_set_clkdiv(&c, 7) ;
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
@@ -75,10 +72,6 @@ static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
-
-    //  #define V_ACTIVE   479    // (active - 1)
-    pio_sm_put_blocking(pio, sm, 239); // 
-    pio_sm_exec(pio, sm, pio_encode_pull(false, false));
 
     // Set the state machine running (commented out so can be synchronized with hsync)
     // pio_sm_set_enabled(pio, sm, true);

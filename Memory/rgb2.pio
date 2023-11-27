@@ -1,0 +1,63 @@
+;
+; Hunter Adams (vha3@cornell.edu)
+; RGB generation for VGA driver
+; mod by Howard Hua for 16-bit color
+;; -- 5 instructions
+
+; Program name
+.program rgb2
+
+.wrap_target
+
+set pins, 0 				; Zero RGB pins in blanking
+mov x, y 					; Initialize counter variable
+
+wait 1 irq 2 [3]			; Wait for vsync active mode (starts 5 cycles after execution)
+
+colorout:
+	out pins, 16    [16]			; Push out to pins (byte pixel)     
+	jmp x-- colorout		; Stay here thru horizontal active mode
+
+.wrap
+
+
+% c-sdk {
+static inline void rgb2_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_config c = rgb2_program_get_default_config(offset);
+    sm_config_set_set_pins(&c, pin, 16);
+    sm_config_set_out_pins(&c, pin, 16);
+    sm_config_set_out_shift (&c, 0, 1, 3) ;
+
+    pio_gpio_init(pio, pin);
+    pio_gpio_init(pio, pin+1);
+    pio_gpio_init(pio, pin+2);
+    pio_gpio_init(pio, pin+3);
+    pio_gpio_init(pio, pin+4);
+    pio_gpio_init(pio, pin+5);
+    pio_gpio_init(pio, pin+6);
+    pio_gpio_init(pio, pin+7);
+    pio_gpio_init(pio, pin+8);
+    pio_gpio_init(pio, pin+9);
+    pio_gpio_init(pio, pin+10);
+    pio_gpio_init(pio, pin+11);
+    pio_gpio_init(pio, pin+12);
+    pio_gpio_init(pio, pin+13);
+    pio_gpio_init(pio, pin+14);
+    pio_gpio_init(pio, pin+15);
+    
+    // Set the pin direction to output at the PIO (16 pins)
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 16, true);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+    //
+    // three lines copied from PWM example to into a register in a sm
+    // (and therefore save two insructions in the sm program)
+    pio_sm_put_blocking(pio, sm, 319); // (horizontal active) - 1
+    pio_sm_exec(pio, sm, pio_encode_pull(false, false));
+    pio_sm_exec(pio, sm, pio_encode_out(pio_y, 32));
+
+    // Set the state machine running (commented out, I'll start this in the C)
+    // pio_sm_set_enabled(pio, sm, true);
+}
+%}
