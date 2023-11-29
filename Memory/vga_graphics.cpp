@@ -3,6 +3,8 @@
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/dma.h"
+// Our assembled programs:
+// Each gets the name <pio_filename.pio.h>
 #include "hsync.pio.h"
 #include "vsync.pio.h"
 #include "rgb.pio.h"
@@ -13,10 +15,15 @@
 #define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE   479    // (active - 1)
 #define RGB_ACTIVE 319    // (horizontal active)/2 - 1
+// #define RGB_ACTIVE 639 // change to this if 1 pixel/byte
 
 // Length of the pixel array, and number of DMA transfers
 #define TXCOUNT 76800 // Total pixels 320x240 (since we have 2 pixels per byte)
+///#define TXCOUNT 30000
 
+// Pixel color array that is DMA's to the PIO machines and
+// a pointer to the ADDRESS of this color array.
+// Note that this array is automatically initialized to all 0's (black)
 unsigned short vga_data_array[TXCOUNT];
 // points to address storing pointer to screen array
 unsigned short * address_pointer = &vga_data_array[0] ;
@@ -56,8 +63,8 @@ void initVGA() {
     // is consolidated in one place. Here in the C, we then just import and use it.
     hsync_program_init(pio, hsync_sm, hsync_offset, HSYNC);
     vsync_program_init(pio, vsync_sm, vsync_offset, VSYNC);
-    rgb_program_init(pio, rgb_sm, rgb_offset, 0);
-    rgb_program_init(pio, rgb_sm3, rgb2_offset, 0);
+    rgb_program_init(pio, rgb_sm, rgb_offset, 0); //8
+    rgb_program_init(pio, rgb_sm3, rgb2_offset, 0); //8
     // Start the two pio machine IN SYNC
     // Note that the RGB state machine is running at full speed,
     // so synchronization doesn't matter for that one. But, we'll
@@ -66,7 +73,7 @@ void initVGA() {
 
     // turn up i/o pin drive
     // void gpio_set_drive_strength (uint gpio, enum gpio_drive_strength drive)
-    for(int i = 0; i < 16; i++){
+    for(int i=0; i<=15; i++){
         gpio_set_drive_strength (i, GPIO_DRIVE_STRENGTH_12MA);
     }
 
@@ -82,7 +89,7 @@ void initVGA() {
     // ===============================================
     // Channel Zero (sends color data to PIO VGA machine)
     dma_channel_config c0 = dma_channel_get_default_config(rgb_chan_0);  // default configs
-    channel_config_set_transfer_data_size(&c0, DMA_SIZE_16);              // 16-bit txfers
+    channel_config_set_transfer_data_size(&c0, DMA_SIZE_16);              // 8-bit txfers
     channel_config_set_read_increment(&c0, true);                        // yes read incrementing
     channel_config_set_write_increment(&c0, false);                      // no write incrementing
     channel_config_set_dreq(&c0, DREQ_PIO0_TX2) ;                        // DREQ_PIO0_TX2 pacing (FIFO)
@@ -94,7 +101,7 @@ void initVGA() {
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
         &vga_data_array,            // place holder for first load from channel one
         TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
-        true                       // Start immediately.
+        true                       // Don't start immediately.
     );
 
     // ===============================================
@@ -117,7 +124,7 @@ void initVGA() {
      // ===============================================
     // Channel 2 (sends color data to PIO VGA machine)
     dma_channel_config c2 = dma_channel_get_default_config(rgb_chan_2);  // default configs
-    channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);              // 16-bit txfers
+    channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);              // 8-bit txfers
     channel_config_set_read_increment(&c2, true);                        // yes read incrementing
     channel_config_set_write_increment(&c2, false);                      // no write incrementing
     channel_config_set_dreq(&c2, DREQ_PIO0_TX3) ;                        // DREQ_PIO0_TX2 pacing (FIFO)
@@ -129,7 +136,7 @@ void initVGA() {
         &pio->txf[rgb_sm3],          // write address (RGB PIO TX FIFO)
         &vga_data_array,            // place holder for first load from channel one
         TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
-        true                       // Start immediately.
+        true                       // Don't start immediately.
     );
 
     // ===============================================
@@ -146,12 +153,8 @@ void initVGA() {
         &dma_hw->ch[rgb_chan_2].read_addr,  // Write address (channel 0 read address)
         &address_pointer,                    // Read address (POINTER TO AN ADDRESS)
         1,                                  // Number of transfers, in this case each is 4 byte
-        true                               // Start immediately.
+        true                               // Don't start immediately.
     );
-
-    for (int i = 0; i < TXCOUNT; i++) {
-        vga_data_array[i] = 65000;
-    }
     
 }
 
@@ -166,6 +169,7 @@ void drawPixel(short x, short y, unsigned short color) {
     if (x < 0) x = 0 ;
     if (y < 0) y = 0 ;
     if (y > 239) y = 239 ;
+    //if((x > 639) | (x < 0) | (y > 479) | (y < 0) ) return;
 
     // Which pixel is it?
     int pixel = ((320 * y ) + x) ;
@@ -174,13 +178,16 @@ void drawPixel(short x, short y, unsigned short color) {
     vga_data_array[pixel] = color ;  
 }
 
-
 // fill a rectangle
 void fillRect(short x, short y, short w, short h, unsigned short color) {
-//   for(int i=x; i<(x+w); i++) {
-//     for(int j=y; j<(y+h); j++) {
-//         drawPixel(i, j, color);
-//     }
-//   }
+for(int j=y; j<(y+h); j++) {
+  for(int i=x; i<(x+w); i++) {
     
+        drawPixel(i, j, (unsigned short)((i + w) * 10));
+        //printf("i: %d, j: %d, color: %d\n", i, j, (i + j) * 10);
+        //sleep_ms(20);
+    }
+  }
+  //printf("%d\n\r", bit_bucket) ;
+
 }

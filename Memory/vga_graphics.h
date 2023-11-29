@@ -16,7 +16,7 @@
 
 
 // Give the I/O pins that we're using some names that make sense - usable in main()
-enum vga_pins {HSYNC=16, VSYNC} ;
+enum vga_pins {HSYNC=21, VSYNC} ;
 
 #define RED     0b0000000000011111
 #define GREEN   0b0000011111100000
