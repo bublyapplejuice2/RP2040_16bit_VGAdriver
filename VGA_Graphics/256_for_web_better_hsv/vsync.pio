@@ -1,6 +1,7 @@
 ;
 ; Hunter Adams (vha3@cornell.edu)
 ; VSync generation for VGA driver
+;; --- 15 instructions
 
 ; Program name
 .program vsync
@@ -13,16 +14,15 @@
 ;
 ; Code size could be reduced with side setting
 
-
-
-pull block                        ; Pull from FIFO to OSR (only once)
 .wrap_target                      ; Program wraps to here
 
 ; ACTIVE
 mov x, osr                        ; Copy value from OSR to x scratch register
 activefront:
     wait 1 irq 0                  ; Wait for hsync to go high
-    irq 1                         ; Signal that we're in active mode
+    irq 1                         ; Signal first rgb machine that we're in active mode
+    wait 1 irq 0                  ; Wait for hsync to go high
+    irq 2                         ; Signal seconde rgb macinethat we're in active mode
     jmp x-- activefront           ; Remain in active mode, decrementing counter
 
 ; FRONTPORCH
@@ -75,6 +75,10 @@ static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    //  #define V_ACTIVE   479    // (active - 1)
+    pio_sm_put_blocking(pio, sm, 239); // 
+    pio_sm_exec(pio, sm, pio_encode_pull(false, false));
 
     // Set the state machine running (commented out so can be synchronized with hsync)
     // pio_sm_set_enabled(pio, sm, true);

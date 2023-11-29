@@ -164,30 +164,21 @@ void initVGA() {
 // a DMA channel, we only need to modify the contents of the array and the
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, unsigned short color) {
-    // Range checks (640x480 display)
     if (x > 319) x = 319 ;
     if (x < 0) x = 0 ;
     if (y < 0) y = 0 ;
     if (y > 239) y = 239 ;
-    //if((x > 639) | (x < 0) | (y > 479) | (y < 0) ) return;
-
     // Which pixel is it?
     int pixel = ((320 * y ) + x) ;
-
     // signel byte/pixel
     vga_data_array[pixel] = color ;  
 }
 
 // fill a rectangle
 void fillRect(short x, short y, short w, short h, unsigned short color) {
-for(int j=y; j<(y+h); j++) {
   for(int i=x; i<(x+w); i++) {
-    
-        drawPixel(i, j, (unsigned short)((i + w) * 10));
-        //printf("i: %d, j: %d, color: %d\n", i, j, (i + j) * 10);
-        //sleep_ms(20);
+    for(int j=y; j<(y+h); j++) {
+        drawPixel(i, j, color);
     }
   }
-  //printf("%d\n\r", bit_bucket) ;
-
 }

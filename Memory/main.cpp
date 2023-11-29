@@ -23,9 +23,11 @@ int main(void) {
 
     initVGA();
     
-    unsigned short color = 0;
-    while (true) {
-        fillRect(0, 0, 319, 240, GREEN);
+    unsigned short color = 10;
+    for (int i = 0; i < 320; ++i) {
+        for (int j = 0; j < 240; ++j) {
+            drawPixel(i, j, color);
+            color += 100;
+        }
     }
-
 }

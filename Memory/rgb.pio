@@ -33,8 +33,8 @@ static inline void rgb_program_init(PIO pio, uint sm, uint offset, uint pin) {
 
     // Map the state machine's SET and OUT pin group to 8 pins, the `pin`
     // parameter to this function is the lowest one. These groups overlap.
-    sm_config_set_set_pins(&c, pin, 16);
-    sm_config_set_out_pins(&c, pin, 16);
+    sm_config_set_set_pins(&c, pin, 15);
+    sm_config_set_out_pins(&c, pin, 15);
 
     // turn off autopull
     //sm_config_set_out_shift (pio_sm_config *c, bool shift_right, bool autopull, uint pull_threshold)
