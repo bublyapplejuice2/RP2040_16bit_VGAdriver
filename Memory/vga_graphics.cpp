@@ -3,8 +3,6 @@
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/dma.h"
-// Our assembled programs:
-// Each gets the name <pio_filename.pio.h>
 #include "hsync.pio.h"
 #include "vsync.pio.h"
 #include "rgb.pio.h"
@@ -12,25 +10,18 @@
 #include "vga_graphics.h"
 
 // VGA timing constants
-#define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
-#define V_ACTIVE   479    // (active - 1)
-#define RGB_ACTIVE 319    // (horizontal active)/2 - 1
-// #define RGB_ACTIVE 639 // change to this if 1 pixel/byte
+#define H_ACTIVE   823    // (active + frontporch - 1) - one cycle delay for mov
+#define V_ACTIVE   599    // (active - 1)
+#define RGB_ACTIVE 410    // (horizontal active)/2 - 1
 
 // Length of the pixel array, and number of DMA transfers
-#define TXCOUNT 76800 // Total pixels 320x240 (since we have 2 pixels per byte)
-///#define TXCOUNT 30000
-
-// Pixel color array that is DMA's to the PIO machines and
-// a pointer to the ADDRESS of this color array.
-// Note that this array is automatically initialized to all 0's (black)
+#define TXCOUNT 120000 // Total pixels 400x300 (since we have 2 pixels per byte)
 unsigned short vga_data_array[TXCOUNT];
-// points to address storing pointer to screen array
 unsigned short * address_pointer = &vga_data_array[0] ;
 
 // Screen width/height
-#define _width 640
-#define _height 480
+#define _width 800
+#define _height 600
 
 void initVGA() {
         // Choose which PIO instance to use (there are two instances, each with 4 state machines)
@@ -63,8 +54,8 @@ void initVGA() {
     // is consolidated in one place. Here in the C, we then just import and use it.
     hsync_program_init(pio, hsync_sm, hsync_offset, HSYNC);
     vsync_program_init(pio, vsync_sm, vsync_offset, VSYNC);
-    rgb_program_init(pio, rgb_sm, rgb_offset, 0); //8
-    rgb_program_init(pio, rgb_sm3, rgb2_offset, 0); //8
+    rgb_program_init(pio, rgb_sm, rgb_offset, 0);
+    rgb_program_init(pio, rgb_sm3, rgb2_offset, 0);
     // Start the two pio machine IN SYNC
     // Note that the RGB state machine is running at full speed,
     // so synchronization doesn't matter for that one. But, we'll
@@ -73,7 +64,7 @@ void initVGA() {
 
     // turn up i/o pin drive
     // void gpio_set_drive_strength (uint gpio, enum gpio_drive_strength drive)
-    for(int i=0; i<=15; i++){
+    for(int i = 0; i < 16; i++){
         gpio_set_drive_strength (i, GPIO_DRIVE_STRENGTH_12MA);
     }
 
@@ -155,6 +146,12 @@ void initVGA() {
         1,                                  // Number of transfers, in this case each is 4 byte
         true                               // Don't start immediately.
     );
+
+    for (int i = 0; i < 400; i++) {
+        for (int j = 0; j < 300; j++) {
+            int pixel = ((400 * j ) + i) ;
+        }
+    }
     
 }
 
@@ -164,21 +161,21 @@ void initVGA() {
 // a DMA channel, we only need to modify the contents of the array and the
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, unsigned short color) {
-    if (x > 319) x = 319 ;
+    if (x > 399) x = 399 ;
     if (x < 0) x = 0 ;
     if (y < 0) y = 0 ;
-    if (y > 239) y = 239 ;
+    if (y > 299) y = 299 ;
     // Which pixel is it?
-    int pixel = ((320 * y ) + x) ;
+    int pixel = ((400 * y ) + x) ;
     // signel byte/pixel
     vga_data_array[pixel] = color ;  
 }
 
 // fill a rectangle
 void fillRect(short x, short y, short w, short h, unsigned short color) {
-  for(int i=x; i<(x+w); i++) {
-    for(int j=y; j<(y+h); j++) {
-        drawPixel(i, j, color);
-    }
-  }
+//   for(int i=x; i<(x+w); i++) {
+//     for(int j=y; j<(y+h); j++) {
+//         drawPixel(i, j, color);
+//     }
+//   }
 }

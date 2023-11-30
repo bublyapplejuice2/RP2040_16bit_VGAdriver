@@ -8,7 +8,7 @@
 // #include "pt_cornell_rp2040_v1.h"
 
 int main(void) {
-    //set_sys_clock_khz(250000, true);
+    set_sys_clock_khz(270000, true);
     stdio_init_all();
 
     uart_inst_t *uart = uart0;
@@ -24,10 +24,11 @@ int main(void) {
     initVGA();
     
     unsigned short color = 10;
-    for (int i = 0; i < 320; ++i) {
-        for (int j = 0; j < 240; ++j) {
-            drawPixel(i, j, color);
-            color += 100;
-        }
-    }
+    // fillRect(0, 0, 399, 299, );
+    // for (int i = 0; i < 320; ++i) {
+    //     for (int j = 0; j < 240; ++j) {
+    //         drawPixel(i, j, color);
+    //         color += 100;
+    //     }
+    // }
 }

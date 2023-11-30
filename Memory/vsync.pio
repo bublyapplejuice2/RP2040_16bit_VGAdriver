@@ -1,16 +1,10 @@
-;
-; Hunter Adams (vha3@cornell.edu)
-; VSync generation for VGA driver
-;; --- 15 instructions
-
-; Program name
 .program vsync
 .side_set 1 opt
 
-; frontporch: 10  lines
+; frontporch: 1  lines
 ; sync pulse: 2   lines
-; back porch: 33  lines (perhaps we try 32, since that's easier)
-; active for: 480 lines
+; back porch: 22  lines (perhaps we try 32, since that's easier)
+; active for: 600 lines
 ;
 ; Code size could be reduced with side setting
 
@@ -22,14 +16,11 @@ activefront:
     wait 1 irq 0                  ; Wait for hsync to go high
     irq 1                         ; Signal first rgb machine that we're in active mode
     wait 1 irq 0                  ; Wait for hsync to go high
-    irq 2                         ; Signal seconde rgb macinethat we're in active mode
+    irq 2                         ; Signal second rgb machine that we're in active mode
     jmp x-- activefront           ; Remain in active mode, decrementing counter
 
 ; FRONTPORCH
-set y, 9                          ;
-frontporch:
-    wait 1 irq 0                  ;
-    jmp y-- frontporch            ;
+wait 1 irq 0                  ;
 
 ; SYNC PULSE
 set pins, 0                       ; Set pin low
@@ -37,13 +28,10 @@ wait 1 irq 0                      ; Wait for one line
 wait 1 irq 0                      ; Wait for a second line
 
 ; BACKPORCH
-set y, 31                         ; First part of back porch into y scratch register (and delays a cycle)
-;set pins, 1                      ; Raise high for back porch (delaying a set cycle) - REPLACED WITH SIDESET
+set y, 21                         ; First part of back porch into y scratch register (and delays a cycle)
 backporch:
     wait 1 irq 0   side 1         ; Wait for hsync to go high - SIDESET REPLACEMENT HERE
     jmp y-- backporch             ; Remain in backporch, decrementing counter
-
-;wait 1 irq 0                      ; Wait for final (33rd) backporch line (eliminated)
 
 .wrap                             ; Program wraps from here
 
@@ -51,11 +39,6 @@ backporch:
 
 % c-sdk {
 static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
-
-    // creates state machine configuration object c, sets
-    // to default configurations. I believe this function is auto-generated
-    // and gets a name of <program name>_program_get_default_config
-    // Yes, page 40 of SDK guide
     pio_sm_config c = vsync_program_get_default_config(offset);
 
     // Map the state machine's SET pin group to one pin, namely the `pin`
@@ -64,23 +47,17 @@ static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_sideset_pins(&c, pin);
 
     // Set clock division (div by 5 for 25 MHz state machine)
-    sm_config_set_clkdiv(&c, 5) ;
+    //sm_config_set_clkdiv(&c, 10) ;
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
-    // pio_gpio_init(pio, pin+1);
     
     // Set the pin direction to output at the PIO
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
-
-    //  #define V_ACTIVE   479    // (active - 1)
-    pio_sm_put_blocking(pio, sm, 239); // 
+    pio_sm_put_blocking(pio, sm, 299); // 
     pio_sm_exec(pio, sm, pio_encode_pull(false, false));
-
-    // Set the state machine running (commented out so can be synchronized with hsync)
-    // pio_sm_set_enabled(pio, sm, true);
 }
 %}

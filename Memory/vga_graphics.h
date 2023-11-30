@@ -27,3 +27,4 @@ enum vga_pins {HSYNC=21, VSYNC} ;
 void initVGA(void) ;
 void drawPixel(short x, short y, unsigned short color) ;
 void fillRect(short x, short y, short w, short h, unsigned short color) ;
+void colorPixel();
