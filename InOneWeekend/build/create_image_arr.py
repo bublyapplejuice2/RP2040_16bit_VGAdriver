@@ -26,10 +26,22 @@ def write_values():
     with open('const_arr.cpp', 'w') as f:
         f.write("#ifndef CONST_ARR_H\n")
         f.write("#define CONST_ARR_H\n")
-        f.write(f"volatile unsigned short vga_data_array[{n}] = {{ ")
-        for i in range(n - 1):
-            f.write(f"{numbers[i]}, ")
-        f.write(f"{numbers[-1]} }};\n")
+        f.write(f"const unsigned short arr[{n}] = {{ ")
+        for j in range(300):
+            for i in range(400):
+                r = i / 399
+                g = j / 299
+                b = (i+j) / 698
+
+                ir = int(r * 31.999)
+                ig = int(g * 63.999)
+                ib = int(b * 31.999)
+
+                color = (ib << 11) | (ig << 5) | ir
+                if i == 399:
+                    color = 0
+                f.write(f"{color}, ")
+        f.write(f"}};\n")
         f.write("#endif")
 
 def write_const():
