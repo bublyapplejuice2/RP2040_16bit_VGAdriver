@@ -8,6 +8,7 @@
 #include "rgb.pio.h"
 #include "rgb2.pio.h"
 #include "vga_graphics.h"
+#include "const_arr.h"
 
 // VGA timing constants
 #define H_ACTIVE   823    // (active + frontporch - 1) - one cycle delay for mov
@@ -16,7 +17,7 @@
 
 // Length of the pixel array, and number of DMA transfers
 #define TXCOUNT 120000 // Total pixels 400x300 (since we have 2 pixels per byte)
-unsigned short vga_data_array[TXCOUNT];
+// unsigned short vga_data_array[TXCOUNT];
 unsigned short * address_pointer = &vga_data_array[0] ;
 
 // Screen width/height
@@ -146,12 +147,14 @@ void initVGA() {
         1,                                  // Number of transfers, in this case each is 4 byte
         true                               // Don't start immediately.
     );
-
-    for (int i = 0; i < 400; i++) {
-        for (int j = 0; j < 300; j++) {
-            int pixel = ((400 * j ) + i) ;
-        }
-    }
+    // unsigned short color = 0;
+    // for (int i = 0; i < 400; i++) {
+    //     for (int j = 0; j < 300; j++) {
+    //         int pixel = ((400 * j) + i);
+    //         vga_data_array[pixel] = color;
+    //         color = color + 10;
+    //     }
+    // }
     
 }
 
@@ -161,14 +164,14 @@ void initVGA() {
 // a DMA channel, we only need to modify the contents of the array and the
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, unsigned short color) {
-    if (x > 399) x = 399 ;
-    if (x < 0) x = 0 ;
-    if (y < 0) y = 0 ;
-    if (y > 299) y = 299 ;
-    // Which pixel is it?
-    int pixel = ((400 * y ) + x) ;
-    // signel byte/pixel
-    vga_data_array[pixel] = color ;  
+    // if (x > 399) x = 399 ;
+    // if (x < 0) x = 0 ;
+    // if (y < 0) y = 0 ;
+    // if (y > 299) y = 299 ;
+    // // Which pixel is it?
+    // int pixel = ((400 * y ) + x) ;
+    // // signel byte/pixel
+    // vga_data_array[pixel] = color ;  
 }
 
 // fill a rectangle
