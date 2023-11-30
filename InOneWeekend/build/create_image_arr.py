@@ -3,8 +3,10 @@ import os
 # Initialize an empty list to store the lines
 numbers = []
 
+FILENAME = "out.ppm"
+
 # Open the file and read line by line
-with open('image.txt', 'r', encoding='utf-16') as file:
+with open(FILENAME, 'r', encoding='utf-16') as file:
     for line in file:
         # You can use line.strip() to remove newline characters
         stripped_line = line.strip()
@@ -24,7 +26,7 @@ def write_values():
     with open('const_arr.cpp', 'w') as f:
         f.write("#ifndef CONST_ARR_H\n")
         f.write("#define CONST_ARR_H\n")
-        f.write(f"unsigned short vga_data_array[{n}] = {{ ")
+        f.write(f"volatile unsigned short vga_data_array[{n}] = {{ ")
         for i in range(n - 1):
             f.write(f"{numbers[i]}, ")
         f.write(f"{numbers[-1]} }};\n")
@@ -41,4 +43,4 @@ def write_const():
         f.write("#endif")
 
 if __name__ == "__main__":
-    write_const()
+    write_values()
