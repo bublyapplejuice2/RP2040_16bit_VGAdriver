@@ -13,7 +13,7 @@ class interval {
   public:
     double min, max;
 
-    interval() : min(+infinity), max(-infinity) {} // Default interval is empty
+    interval() : min(+inf), max(-inf) {} // Default interval is empty
 
     interval(double _min, double _max) : min(_min), max(_max) {}
 
@@ -43,8 +43,8 @@ class interval {
     static const interval empty, universe;
 };
 
-const interval interval::empty    = interval(+infinity, -infinity);
-const interval interval::universe = interval(-infinity, +infinity);
+const interval interval::empty    = interval(+inf, -inf);
+const interval interval::universe = interval(-inf, +inf);
 
 
 #endif

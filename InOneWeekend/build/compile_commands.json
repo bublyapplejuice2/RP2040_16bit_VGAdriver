@@ -1,7 +1,0 @@
-[
-{
-  "directory": "C:/Users/mw756/Downloads/raytracing.github.io-release/raytracing.github.io-release/src/InOneWeekend/build",
-  "command": "C:\\PROGRA~2\\MICROS~3\\2019\\BUILDT~1\\VC\\Tools\\MSVC\\1429~1.301\\bin\\Hostx86\\x86\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -MDd \"/we 4265\" \"/w3 5038\" \"/we 5204\" /FoCMakeFiles\\inOneWeekend.dir\\main.cpp.obj /FdCMakeFiles\\inOneWeekend.dir\\ /FS -c C:\\Users\\mw756\\Downloads\\raytracing.github.io-release\\raytracing.github.io-release\\src\\InOneWeekend\\main.cpp",
-  "file": "C:/Users/mw756/Downloads/raytracing.github.io-release/raytracing.github.io-release/src/InOneWeekend/main.cpp"
-}
-]

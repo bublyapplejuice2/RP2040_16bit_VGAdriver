@@ -1,3 +1,0 @@
-C:/Users/mw756/Downloads/raytracing.github.io-release/raytracing.github.io-release/src/InOneWeekend/build/CMakeFiles/inOneWeekend.dir
-C:/Users/mw756/Downloads/raytracing.github.io-release/raytracing.github.io-release/src/InOneWeekend/build/CMakeFiles/edit_cache.dir
-C:/Users/mw756/Downloads/raytracing.github.io-release/raytracing.github.io-release/src/InOneWeekend/build/CMakeFiles/rebuild_cache.dir

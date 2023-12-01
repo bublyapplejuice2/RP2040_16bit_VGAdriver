@@ -22,7 +22,7 @@ inline double linear_to_gamma(double linear_component)
     return sqrt(linear_component);
 }
 
-void write_color(std::ostream &out, color pixel_color, int samples_per_pixel) {
+unsigned short get_color(color pixel_color, int samples_per_pixel) {
     auto r = pixel_color.x();
     auto g = pixel_color.y();
     auto b = pixel_color.z();
@@ -38,11 +38,12 @@ void write_color(std::ostream &out, color pixel_color, int samples_per_pixel) {
     g = linear_to_gamma(g);
     b = linear_to_gamma(b);
 
-    // Write the translated [0,255] value of each color component.
     static const interval intensity(0.000, 0.999);
-    out << static_cast<int>(256 * intensity.clamp(r)) << ' '
-        << static_cast<int>(256 * intensity.clamp(g)) << ' '
-        << static_cast<int>(256 * intensity.clamp(b)) << '\n';
+    unsigned short combined_color = static_cast<unsigned short>(32 * intensity.clamp(b)) << 11 |
+                                    static_cast<unsigned short>(64 * intensity.clamp(g)) << 5 |
+                                    static_cast<unsigned short>(32 * intensity.clamp(r));
+
+    return combined_color;
 }
 
 
