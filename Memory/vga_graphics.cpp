@@ -8,7 +8,7 @@
 #include "rgb.pio.h"
 #include "rgb2.pio.h"
 #include "vga_graphics.h"
-// #include "const_arr.h"
+
 
 // VGA timing constants
 #define H_ACTIVE   823    // (active + frontporch - 1) - one cycle delay for mov
@@ -149,11 +149,24 @@ void initVGA() {
     );
 }
 
+int flash_to_ram = 4;
 
-// A function for drawing a pixel with a specified color.
-// Note that because information is passed to the PIO state machines through
-// a DMA channel, we only need to modify the contents of the array and the
-// pixels will be automatically updated on the screen.
+void displayImage(const unsigned short *image) {
+    dma_channel_abort(flash_to_ram);
+    dma_channel_config c4 = dma_channel_get_default_config(flash_to_ram);  // default configs
+    channel_config_set_transfer_data_size(&c4, DMA_SIZE_16);              // 16-bit txfers
+    channel_config_set_read_increment(&c4, true);                        // yes read incrementing
+    channel_config_set_write_increment(&c4, true);                      // yes write incrementing
+
+    dma_channel_configure(
+        flash_to_ram,                 // Channel to be configured
+        &c4,                          // The configuration we just created
+        address_pointer,              // write address (vga_data_array)
+        image,                 // read address (flash_array)
+        TXCOUNT,                      // Number of transfers; in this case each is 1 byte.
+        true                          // Don't start immediately.
+    );
+}
 
 void drawPixel(int index, unsigned short color) {
     vga_data_array[index] = color ;
@@ -164,9 +177,7 @@ void drawPixel(short x, short y, unsigned short color) {
     if (x < 0) x = 0 ;
     if (y < 0) y = 0 ;
     if (y > 299) y = 299 ;
-    // Which pixel is it?
     int pixel = ((400 * y ) + x) ;
-    // signel byte/pixel
     vga_data_array[pixel] = color ;  
 }
 
@@ -177,17 +188,4 @@ void fillRect(short x, short y, short w, short h, unsigned short color) {
         drawPixel(i, j, color);
     }
   }
-    // unsigned short new_color;
-    // int idx = 0;
-    // for (int i = 0; i < 399; i++) {
-    //     for (int j = 0; j < 299; j++) {
-    //         int pixel = ((400 * j) + i);
-    //         vga_data_array[pixel] = new_color;
-    //         idx++;
-    //         if (idx == 4) {
-    //             idx = 0;
-    //             new_color++;
-    //         }
-    //     }
-    // }
 }

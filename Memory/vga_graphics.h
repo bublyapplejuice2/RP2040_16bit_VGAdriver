@@ -24,6 +24,7 @@ enum vga_pins {HSYNC=21, VSYNC} ;
 
 // VGA primitives - usable in main
 void initVGA(void) ;
+void displayImage(const unsigned short *image) ;
 void drawPixel(int index, unsigned short color) ;
 void drawPixel(short x, short y, unsigned short color) ;
 void fillRect(short x, short y, short w, short h, unsigned short color) ;
