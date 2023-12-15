@@ -9,7 +9,6 @@
 #include "rgb2.pio.h"
 #include "vga_graphics.h"
 
-
 // VGA timing constants
 #define H_ACTIVE   823    // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE   599    // (active - 1)

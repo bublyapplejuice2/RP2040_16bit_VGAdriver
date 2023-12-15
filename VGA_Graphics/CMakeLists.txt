@@ -1,6 +1,0 @@
-add_subdirectory(Animation_Demo)
-add_subdirectory(Barnsley_Fern)
-add_subdirectory(Mandelbrot_Set)
-add_subdirectory(Game_of_Life)
-add_subdirectory(256_for_web_better_hsv)
-add_subdirectory(Boids)

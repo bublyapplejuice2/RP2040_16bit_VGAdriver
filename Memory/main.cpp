@@ -9,8 +9,6 @@
 #include "hardware/sync.h"
 #include "vga_graphics.h"
 
-#include "pt_cornell_rp2040_v1.h"
-
 #include "const_arr.h"
 
 int i = 0;
